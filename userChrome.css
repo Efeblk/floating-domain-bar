@@ -6,6 +6,7 @@
 :root {
   --floating-domain-bar-offset: 10px;
   --floating-domain-bar-width: min(680px, 58vw);
+  --floating-domain-bar-sidebar-width: 0px;
   --floating-domain-bar-control-gap: 3px;
   --floating-domain-bar-radius: 14px;
   --floating-domain-bar-shadow:
@@ -32,58 +33,296 @@
 :root:not([customizing]) #zen-appcontent-navbar-container {
   position: absolute !important;
   inset: 0 0 auto !important;
+  width: 100% !important;
   overflow: visible !important;
   background: transparent !important;
   pointer-events: none !important;
 }
 
 :root:not([customizing]) #nav-bar {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  min-height: 40px !important;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
   overflow: visible !important;
-  justify-content: center !important;
   padding: var(--floating-domain-bar-offset) 0 0 !important;
   pointer-events: none !important;
 }
 
-/* Remove the edge spacers and bring all native buttons beside the field. */
-:root:not([customizing]) #nav-bar > .titlebar-spacer,
-:root:not([customizing]) #nav-bar > toolbartabstop,
-:root:not([customizing]) #nav-bar > #taskbar-tabs-favicon,
-:root:not([customizing]) #nav-bar-customization-target > toolbarspring {
+/* Once JS relocates the useful controls, suppress the now-empty toolbar row. */
+:root[floating-domain-bar-layout-ready]:not([customizing])
+  #nav-bar
+  > :not(#nav-bar-customization-target):not(.titlebar-buttonbox-container),
+:root[floating-domain-bar-layout-ready]:not([customizing])
+  #nav-bar-customization-target
+  > * {
   display: none !important;
 }
 
-:root:not([customizing]) #nav-bar-customization-target {
-  flex: 0 1 auto !important;
-  width: auto !important;
-  min-width: 0 !important;
+:root:not([customizing]) #tabbrowser-tabbox {
+  position: relative !important;
+}
+
+/* This grid lives inside the web-content box, so its middle is always exact. */
+#floating-domain-bar-layout {
+  position: absolute !important;
+  inset: var(--floating-domain-bar-offset) 0 auto !important;
+  z-index: 1000 !important;
+  display: grid !important;
+  grid-template-columns:
+    minmax(0, 1fr)
+    var(--floating-domain-bar-width)
+    minmax(0, 1fr) !important;
   align-items: center !important;
-  justify-content: center !important;
-  gap: var(--floating-domain-bar-control-gap) !important;
+  width: 100% !important;
+  height: 32px !important;
   pointer-events: none !important;
 }
 
-/* Empty toolbar space lets clicks reach the page; real controls stay usable. */
-:root:not([customizing]) #nav-bar-customization-target > :not(toolbarspring),
-:root:not([customizing]) #nav-bar-overflow-button,
-:root:not([customizing]) #PanelUI-button,
-:root:not([customizing]) #urlbar,
-:root:not([customizing]) .titlebar-buttonbox-container {
+/* Split View gets one independent address/search bar per visible panel. */
+:root[floating-domain-bar-split-active]:not([customizing])
+  #floating-domain-bar-layout {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+#floating-domain-split-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1001;
+  display: none;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#floating-domain-split-layer[data-active] {
+  display: block;
+}
+
+.floating-domain-split-bar {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.floating-domain-split-bar[hidden] {
+  display: none;
+}
+
+.floating-domain-split-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  pointer-events: auto;
+}
+
+.floating-domain-split-button {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  color: color-mix(in srgb, currentColor 80%, transparent);
+  font: menu;
+  font-size: 21px;
+  line-height: 1;
+  background: color-mix(
+    in srgb,
+    var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) 80%,
+    transparent
+  );
+  border: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(16px) saturate(1.1);
+  cursor: default;
+}
+
+.floating-domain-split-button:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) 94%,
+    currentColor 6%
+  );
+}
+
+.floating-domain-split-button:disabled {
+  opacity: 0.38;
+}
+
+.floating-domain-split-input-shell {
+  position: relative;
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  overflow: hidden;
+  background: color-mix(
+    in srgb,
+    var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) 88%,
+    transparent
+  );
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: var(--floating-domain-bar-radius);
+  box-shadow: var(--floating-domain-bar-shadow);
+  backdrop-filter: blur(18px) saturate(1.15);
+  pointer-events: auto;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.floating-domain-split-bar[data-selected]
+  .floating-domain-split-input-shell,
+.floating-domain-split-input-shell:focus-within {
+  border-color: color-mix(
+    in srgb,
+    var(--zen-primary-color, AccentColor) 48%,
+    transparent
+  );
+}
+
+.floating-domain-split-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 13px;
+  appearance: none;
+  color: color-mix(in srgb, currentColor 84%, transparent);
+  font: menu;
+  font-weight: 600;
+  line-height: 32px;
+  text-align: center;
+  text-overflow: ellipsis;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.floating-domain-split-input[data-editing="true"] {
+  font-weight: 400;
+  text-align: start;
+}
+
+.floating-domain-split-bar[data-narrow] {
+  gap: 0;
+}
+
+.floating-domain-split-bar[data-narrow]
+  .floating-domain-split-controls {
+  display: none;
+}
+
+/* Compact Mode overlays the sidebar on a full-width page. Counter that shift
+ * so Ctrl+S never changes the bar's on-screen center. */
+:root[zen-compact-mode="true"]:not([zen-right-side="true"]):not([customizing])
+  #floating-domain-bar-layout {
+  transform: translateX(
+    calc(var(--floating-domain-bar-sidebar-width) / 2 - 12px)
+  ) !important;
+}
+
+:root[zen-compact-mode="true"][zen-right-side="true"]:not([customizing])
+  #floating-domain-bar-layout {
+  transform: translateX(
+    calc(var(--floating-domain-bar-sidebar-width) / -2 + 12px)
+  ) !important;
+}
+
+#floating-domain-bar-left-controls,
+#floating-domain-bar-right-controls {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--floating-domain-bar-control-gap) !important;
+  min-width: 0 !important;
+  pointer-events: none !important;
+}
+
+#floating-domain-bar-left-controls {
+  justify-self: end !important;
+  justify-content: flex-end !important;
+  padding-inline-end: 7px !important;
+}
+
+#floating-domain-bar-right-controls {
+  justify-self: start !important;
+  justify-content: flex-start !important;
+  padding-inline-start: 7px !important;
+}
+
+#floating-domain-bar-layout #back-button,
+#floating-domain-bar-layout #forward-button,
+#floating-domain-bar-layout #stop-reload-button,
+#floating-domain-bar-layout #PanelUI-button,
+#floating-domain-bar-layout #urlbar {
+  position: static !important;
+  inset: auto !important;
+  margin: 0 !important;
+  transform: none !important;
   pointer-events: auto !important;
 }
 
-/* The address field is the visual center; native controls sit on either side. */
-#urlbar-container {
-  flex: 0 1 680px !important;
-  width: var(--floating-domain-bar-width) !important;
-  max-width: 680px !important;
-  min-width: 260px !important;
-  margin-inline: 7px !important;
+#floating-domain-bar-layout .toolbarbutton-text {
+  display: none !important;
+}
+
+#floating-domain-bar-layout .toolbarbutton-icon {
+  display: block !important;
+}
+
+#floating-domain-bar-layout #back-button,
+#floating-domain-bar-layout #forward-button,
+#floating-domain-bar-layout #stop-reload-button,
+#floating-domain-bar-layout #PanelUI-button {
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+}
+
+/* The address field occupies the exact center column of the content grid. */
+#floating-domain-bar-layout #urlbar-container {
   position: relative !important;
-  top: 0 !important;
+  inset: auto !important;
+  grid-column: 2 !important;
+  flex: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  transform: none !important;
   z-index: 100 !important;
+}
+
+/* Zen's Ctrl+S Compact Mode must not hide or fade this persistent bar. */
+:root[zen-compact-mode="true"]:not([customizing])
+  #zen-appcontent-navbar-container,
+:root[zen-compact-mode="true"]:not([customizing]) #nav-bar {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+:root[zen-compact-mode="true"]:not([customizing])
+  #urlbar:not([breakout-extend]) {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 #urlbar:not([breakout-extend]) > .urlbar-background,
@@ -155,14 +394,17 @@
 
 /* Respect users who disable animation or transparency. */
 @media (prefers-reduced-motion: reduce) {
-  #floating-domain-bar-label {
+  #floating-domain-bar-label,
+  .floating-domain-split-input-shell {
     transition: none;
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   #urlbar:not([breakout-extend]) > .urlbar-background,
-  #urlbar:not([breakout-extend]) > #urlbar-background {
+  #urlbar:not([breakout-extend]) > #urlbar-background,
+  .floating-domain-split-input-shell,
+  .floating-domain-split-button {
     background-color: var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) !important;
     backdrop-filter: none !important;
   }
