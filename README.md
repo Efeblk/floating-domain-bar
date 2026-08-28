@@ -1,7 +1,8 @@
 # Floating Domain Bar
 
-Zen Browser'ın adres çubuğunu üst kenardan hafifçe ayırır ve boşta dururken tam
-URL yerine yalnızca sitenin ana alan adını gösterir.
+Zen Browser'ın normal üst araç çubuğu için ayırdığı satırı kaldırır, adres
+çubuğunu sayfanın üzerinde yüzdürür ve yerleşik gezinme düğmelerini yanına
+toplar. Boşta dururken tam URL yerine yalnızca sitenin ana alan adını gösterir.
 
 Örnek:
 

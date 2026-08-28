@@ -6,28 +6,83 @@
 :root {
   --floating-domain-bar-offset: 10px;
   --floating-domain-bar-width: min(680px, 58vw);
+  --floating-domain-bar-control-gap: 3px;
   --floating-domain-bar-radius: 14px;
   --floating-domain-bar-shadow:
     0 10px 28px rgba(0, 0, 0, 0.18),
     0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
-/* Keep Zen's toolbar transparent and let the address bar extend below it. */
-#nav-bar {
+/*
+ * Zen normally reserves a full horizontal row for the navigation toolbar.
+ * Collapse that row and paint its contents over the page instead, so only the
+ * floating field and its controls remain visible. Customize mode stays normal.
+ */
+:root:not([customizing]) #zen-appcontent-navbar-wrapper {
+  position: relative !important;
+  z-index: 1000 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: visible !important;
   background: transparent !important;
   box-shadow: none !important;
-  overflow: visible !important;
+  pointer-events: none !important;
 }
 
-/* Detach only the address-bar item; the surrounding toolbar buttons stay put. */
+:root:not([customizing]) #zen-appcontent-navbar-container {
+  position: absolute !important;
+  inset: 0 0 auto !important;
+  overflow: visible !important;
+  background: transparent !important;
+  pointer-events: none !important;
+}
+
+:root:not([customizing]) #nav-bar {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  justify-content: center !important;
+  padding: var(--floating-domain-bar-offset) 0 0 !important;
+  pointer-events: none !important;
+}
+
+/* Remove the edge spacers and bring all native buttons beside the field. */
+:root:not([customizing]) #nav-bar > .titlebar-spacer,
+:root:not([customizing]) #nav-bar > toolbartabstop,
+:root:not([customizing]) #nav-bar > #taskbar-tabs-favicon,
+:root:not([customizing]) #nav-bar-customization-target > toolbarspring {
+  display: none !important;
+}
+
+:root:not([customizing]) #nav-bar-customization-target {
+  flex: 0 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--floating-domain-bar-control-gap) !important;
+  pointer-events: none !important;
+}
+
+/* Empty toolbar space lets clicks reach the page; real controls stay usable. */
+:root:not([customizing]) #nav-bar-customization-target > :not(toolbarspring),
+:root:not([customizing]) #nav-bar-overflow-button,
+:root:not([customizing]) #PanelUI-button,
+:root:not([customizing]) #urlbar,
+:root:not([customizing]) .titlebar-buttonbox-container {
+  pointer-events: auto !important;
+}
+
+/* The address field is the visual center; native controls sit on either side. */
 #urlbar-container {
   flex: 0 1 680px !important;
   width: var(--floating-domain-bar-width) !important;
   max-width: 680px !important;
   min-width: 260px !important;
-  margin-inline: auto !important;
+  margin-inline: 7px !important;
   position: relative !important;
-  top: var(--floating-domain-bar-offset) !important;
+  top: 0 !important;
   z-index: 100 !important;
 }
 

@@ -1,9 +1,9 @@
 {
   "id": "floating-domain-bar",
   "name": "Floating Domain Bar",
-  "description": "Floats Zen's address bar and shows only the current site's domain until editing.",
+  "description": "Overlays a floating address bar and nearby controls without reserving a toolbar row, showing only the current site's domain until editing.",
   "author": "efeba",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "createdAt": "2026-08-29",
   "updatedAt": "2026-08-29",
   "style": {
