@@ -1,0 +1,29 @@
+{
+  "id": "floating-domain-bar",
+  "name": "Floating Domain Bar",
+  "description": "Floats Zen's address bar and shows only the current site's domain until editing.",
+  "author": "efeba",
+  "version": "0.1.0",
+  "createdAt": "2026-08-29",
+  "updatedAt": "2026-08-29",
+  "style": {
+    "chrome": "userChrome.css"
+  },
+  "scripts": {
+    "floating-domain-bar.uc.js": {
+      "name": "Domain label",
+      "description": "Shows the current site's domain without changing the real address field.",
+      "include": [
+        "chrome://browser/content/browser.xhtml"
+      ]
+    }
+  },
+  "tags": [
+    "zen",
+    "urlbar",
+    "minimal"
+  ],
+  "fork": [
+    "zen"
+  ]
+}

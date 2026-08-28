@@ -1,0 +1,125 @@
+/*
+ * Floating Domain Bar
+ * Tested against Zen 1.21.16b / Gecko 154 on Windows.
+ */
+
+:root {
+  --floating-domain-bar-offset: 10px;
+  --floating-domain-bar-width: min(680px, 58vw);
+  --floating-domain-bar-radius: 14px;
+  --floating-domain-bar-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Keep Zen's toolbar transparent and let the address bar extend below it. */
+#nav-bar {
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* Detach only the address-bar item; the surrounding toolbar buttons stay put. */
+#urlbar-container {
+  flex: 0 1 680px !important;
+  width: var(--floating-domain-bar-width) !important;
+  max-width: 680px !important;
+  min-width: 260px !important;
+  margin-inline: auto !important;
+  position: relative !important;
+  top: var(--floating-domain-bar-offset) !important;
+  z-index: 100 !important;
+}
+
+#urlbar:not([breakout-extend]) > .urlbar-background,
+#urlbar:not([breakout-extend]) > #urlbar-background {
+  background-color: color-mix(
+    in srgb,
+    var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) 88%,
+    transparent
+  ) !important;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent) !important;
+  border-radius: var(--floating-domain-bar-radius) !important;
+  box-shadow: var(--floating-domain-bar-shadow) !important;
+  backdrop-filter: blur(18px) saturate(1.15) !important;
+}
+
+#urlbar:not([breakout-extend]) {
+  border-radius: var(--floating-domain-bar-radius) !important;
+}
+
+/* Keep Zen's expanded editor near the ceiling too. */
+#urlbar[open][zen-floating-urlbar="true"] {
+  top: calc(var(--floating-domain-bar-offset) + 6px) !important;
+}
+
+/* The script places this harmless visual label over the untouched URL input. */
+#urlbar .urlbar-input-box {
+  position: relative !important;
+}
+
+#floating-domain-bar-label {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding-inline: 12px;
+  overflow: hidden;
+  color: color-mix(in srgb, currentColor 82%, transparent);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+/* Hide only the painted URL while idle. Its actual value remains unchanged. */
+#urlbar:not([focused]):not([open]):not([usertyping]):not([breakout-extend])
+  #urlbar-input {
+  color: transparent !important;
+  caret-color: transparent !important;
+  text-shadow: none !important;
+}
+
+#urlbar:not([focused]):not([open]):not([usertyping]):not([breakout-extend])
+  #urlbar-scheme {
+  visibility: hidden !important;
+}
+
+#urlbar:not([focused]):not([open]):not([usertyping]):not([breakout-extend])
+  #floating-domain-bar-label:not(:empty) {
+  opacity: 1;
+}
+
+/* Respect users who disable animation or transparency. */
+@media (prefers-reduced-motion: reduce) {
+  #floating-domain-bar-label {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  #urlbar:not([breakout-extend]) > .urlbar-background,
+  #urlbar:not([breakout-extend]) > #urlbar-background {
+    background-color: var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* Avoid crushing the field in narrow windows. */
+@media (max-width: 760px) {
+  :root {
+    --floating-domain-bar-width: min(520px, 72vw);
+  }
+
+  #urlbar-container {
+    flex-basis: 520px !important;
+  }
+}
