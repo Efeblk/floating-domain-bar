@@ -5,6 +5,8 @@
   const LABEL_ID = "floating-domain-bar-label";
   const LAYOUT_ID = "floating-domain-bar-layout";
   const SPLIT_LAYER_ID = "floating-domain-split-layer";
+  const PAGE_COLOR_MESSAGE = "FloatingDomainBar:PageColor";
+  const PAGE_COLOR_DESTROY_MESSAGE = "FloatingDomainBar:DestroyPageColorSampler";
   const HTML_NS = "http://www.w3.org/1999/xhtml";
 
   if (window[STATE_KEY]) {
@@ -130,6 +132,227 @@
       "true"
     );
 
+    /* Read the page canvas color without changing the page DOM. The sampled
+     * color is painted only on Zen's reserved browser-chrome header. */
+    const frameManager = window.messageManager;
+    const pageAppearanceByBrowser = new WeakMap();
+    let refreshAppearance = () => {};
+    let pageColorFrameScriptURL = null;
+    const onPageColor = message => {
+      const browser = message.target;
+      const container = browser?.closest?.(".browserSidebarContainer");
+      const color = message.data?.color;
+      const tone = message.data?.tone === "light" ? "light" : "dark";
+
+      if (!container) {
+        return;
+      }
+
+      if (
+        typeof color === "string" &&
+        color &&
+        window.CSS?.supports?.("color", color)
+      ) {
+        container.style.setProperty("--floating-domain-page-color", color);
+        container.setAttribute("floating-domain-page-tone", tone);
+        pageAppearanceByBrowser.set(browser, { color, tone });
+      } else {
+        container.style.removeProperty("--floating-domain-page-color");
+        container.removeAttribute("floating-domain-page-tone");
+        pageAppearanceByBrowser.delete(browser);
+      }
+
+      refreshAppearance();
+    };
+
+    if (frameManager?.loadFrameScript) {
+      frameManager.addMessageListener(PAGE_COLOR_MESSAGE, onPageColor);
+      const pageColorFrameScript = `(() => {
+        const COLOR_MESSAGE = ${JSON.stringify(PAGE_COLOR_MESSAGE)};
+        const DESTROY_MESSAGE = ${JSON.stringify(PAGE_COLOR_DESTROY_MESSAGE)};
+        let observer = null;
+        let timer = 0;
+
+        const isTransparent = value =>
+          !value ||
+          value === "transparent" ||
+          /^rgba\\([^,]+,[^,]+,[^,]+,\\s*0(?:\\.0+)?\\s*\\)$/i.test(value) ||
+          /\\/\\s*0(?:\\.0+)?\\s*\\)$/i.test(value);
+
+        const colorAtPoint = (doc, x, y) => {
+          const width = Math.max(1, content.innerWidth);
+          const height = Math.max(1, content.innerHeight);
+          const safeX = Math.max(0, Math.min(width - 1, x));
+          const safeY = Math.max(0, Math.min(height - 1, y));
+          const elements = doc.elementsFromPoint?.(safeX, safeY) ?? [];
+
+          for (const element of elements) {
+            const color = content.getComputedStyle(element).backgroundColor;
+            if (!isTransparent(color)) {
+              return color;
+            }
+          }
+
+          return "";
+        };
+
+        const chooseVisibleColor = doc => {
+          const width = Math.max(1, content.innerWidth);
+          const yNear = Math.min(8, Math.max(0, content.innerHeight - 1));
+          const yLower = Math.min(40, Math.max(0, content.innerHeight - 1));
+          const points = [
+            [8, yNear],
+            [width - 9, yNear],
+            [width * 0.25, yNear],
+            [width * 0.75, yNear],
+            [8, yLower],
+            [width - 9, yLower],
+          ];
+          const colors = points
+            .map(([x, y]) => colorAtPoint(doc, x, y))
+            .filter(Boolean);
+
+          if (!colors.length) {
+            return "";
+          }
+
+          const counts = new Map();
+          for (const color of colors) {
+            counts.set(color, (counts.get(color) ?? 0) + 1);
+          }
+
+          return colors.reduce((best, color) =>
+            (counts.get(color) ?? 0) > (counts.get(best) ?? 0) ? color : best
+          );
+        };
+
+        const toneForColor = color => {
+          const match = color.match(
+            /^rgba?\\(\\s*([\\d.]+)[, ]+\\s*([\\d.]+)[, ]+\\s*([\\d.]+)/i
+          );
+          if (!match) {
+            return "dark";
+          }
+
+          const channels = match.slice(1, 4).map(value => {
+            const channel = Math.max(0, Math.min(255, Number(value))) / 255;
+            return channel <= 0.04045
+              ? channel / 12.92
+              : ((channel + 0.055) / 1.055) ** 2.4;
+          });
+          const luminance =
+            channels[0] * 0.2126 +
+            channels[1] * 0.7152 +
+            channels[2] * 0.0722;
+
+          return luminance > 0.179 ? "light" : "dark";
+        };
+
+        const readPageColor = () => {
+          timer = 0;
+          const doc = content.document;
+          const root = doc?.documentElement;
+          const body = doc?.body;
+
+          if (!root || root.localName !== "html") {
+            sendAsyncMessage(COLOR_MESSAGE, { color: "" });
+            return;
+          }
+
+          const rootColor = content.getComputedStyle(root).backgroundColor;
+          const bodyColor = body
+            ? content.getComputedStyle(body).backgroundColor
+            : "";
+          const visibleColor = chooseVisibleColor(doc);
+          const color = visibleColor ||
+            (!isTransparent(rootColor)
+              ? rootColor
+              : !isTransparent(bodyColor)
+                ? bodyColor
+                : "");
+
+          sendAsyncMessage(COLOR_MESSAGE, {
+            color,
+            tone: toneForColor(color),
+          });
+        };
+
+        const scheduleRead = () => {
+          if (timer) {
+            content.clearTimeout(timer);
+          }
+          timer = content.setTimeout(readPageColor, 40);
+        };
+
+        const observeDocument = () => {
+          observer?.disconnect();
+          observer = null;
+
+          const doc = content.document;
+          const root = doc?.documentElement;
+          if (!root || root.localName !== "html") {
+            scheduleRead();
+            return;
+          }
+
+          observer = new content.MutationObserver(scheduleRead);
+          observer.observe(root, {
+            attributes: true,
+            attributeFilter: ["class", "style"],
+          });
+          if (doc.body) {
+            observer.observe(doc.body, {
+              attributes: true,
+              attributeFilter: ["class", "style"],
+            });
+          }
+          scheduleRead();
+        };
+
+        const destroy = () => {
+          removeEventListener("DOMContentLoaded", observeDocument, true);
+          removeEventListener("pageshow", observeDocument, true);
+          removeEventListener("load", scheduleRead, true);
+          removeEventListener("resize", scheduleRead, true);
+          removeEventListener("scroll", scheduleRead, true);
+          observer?.disconnect();
+          if (timer) {
+            content.clearTimeout(timer);
+          }
+          removeMessageListener(DESTROY_MESSAGE, destroy);
+        };
+
+        addEventListener("DOMContentLoaded", observeDocument, true);
+        addEventListener("pageshow", observeDocument, true);
+        addEventListener("load", scheduleRead, true);
+        addEventListener("resize", scheduleRead, true);
+        addEventListener("scroll", scheduleRead, true);
+        addMessageListener(DESTROY_MESSAGE, destroy);
+        observeDocument();
+      })();`;
+
+      pageColorFrameScriptURL =
+        "data:application/javascript;charset=utf-8," +
+        encodeURIComponent(pageColorFrameScript);
+      frameManager.loadFrameScript(pageColorFrameScriptURL, true);
+    }
+
+    const updateBrowserLayoutMode = () => {
+      const root = document.documentElement;
+      const sidebarExpanded =
+        root.getAttribute("zen-sidebar-expanded") === "true";
+      const singleToolbar =
+        root.getAttribute("zen-single-toolbar") === "true";
+      const mode = !sidebarExpanded
+        ? "collapsed-sidebar"
+        : singleToolbar
+          ? "only-sidebar"
+          : "sidebar-and-top-toolbar";
+
+      root.setAttribute("floating-domain-bar-browser-layout", mode);
+    };
+    updateBrowserLayoutMode();
+
     const update = uri => {
       const currentURI = uri || gBrowser.selectedBrowser?.currentURI;
       label.textContent = labelForURI(currentURI);
@@ -173,7 +396,10 @@
     const sidebarObserver = new ResizeObserver(scheduleSidebarUpdate);
     sidebarObserver.observe(sidebar);
 
-    const sidebarStateObserver = new MutationObserver(scheduleSidebarUpdate);
+    const sidebarStateObserver = new MutationObserver(() => {
+      updateBrowserLayoutMode();
+      scheduleSidebarUpdate();
+    });
     sidebarStateObserver.observe(sidebar, { attributes: true });
     sidebarStateObserver.observe(document.documentElement, {
       attributes: true,
@@ -181,6 +407,7 @@
         "zen-compact-mode",
         "zen-compact-animating",
         "zen-sidebar-expanded",
+        "zen-single-toolbar",
         "zen-right-side",
       ],
     });
@@ -223,21 +450,73 @@
       });
     };
 
+    const applyTone = (element, appearance) => {
+      element?.setAttribute(
+        "data-page-tone",
+        appearance?.tone === "light" ? "light" : "dark"
+      );
+    };
+
+    const updateMaterialAppearance = () => {
+      const tabs = getActiveSplitTabs();
+
+      for (const [tab, entry] of splitBars) {
+        applyTone(
+          entry.bar,
+          pageAppearanceByBrowser.get(tab.linkedBrowser)
+        );
+      }
+
+      let edgeBrowser = gBrowser.selectedBrowser;
+      if (tabs.length >= 2) {
+        const rightmostTab = tabs.reduce((best, tab) => {
+          if (!best) {
+            return tab;
+          }
+          const right = getSplitContainer(tab)?.getBoundingClientRect().right ?? 0;
+          const bestRight =
+            getSplitContainer(best)?.getBoundingClientRect().right ?? 0;
+          return right > bestRight ? tab : best;
+        }, null);
+        edgeBrowser = rightmostTab?.linkedBrowser ?? edgeBrowser;
+      }
+
+      const rootTone =
+        pageAppearanceByBrowser.get(edgeBrowser)?.tone === "light"
+          ? "light"
+          : "dark";
+      document.documentElement.setAttribute(
+        "floating-domain-page-tone",
+        rootTone
+      );
+    };
+
+    refreshAppearance = updateMaterialAppearance;
+    refreshAppearance();
+
     const activateTab = tab => {
       if (tab && !tab.closing && gBrowser.selectedTab !== tab) {
         gBrowser.selectedTab = tab;
       }
     };
 
-    const makeSplitButton = (symbol, title, action) => {
+    const makeSplitButton = (actionName, title, action) => {
       const button = document.createElementNS(HTML_NS, "button");
       button.type = "button";
       button.className = "floating-domain-split-button";
-      button.textContent = symbol;
+      button.dataset.action = actionName;
       button.title = title;
       button.setAttribute("aria-label", title);
-      button.addEventListener("mousedown", event => event.preventDefault());
+      button.addEventListener("pointerdown", event => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      button.addEventListener("mousedown", event => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
       button.addEventListener("click", event => {
+        event.preventDefault();
         event.stopPropagation();
         action();
       });
@@ -298,6 +577,7 @@
       entry.back.disabled = !browser.canGoBack;
       entry.forward.disabled = !browser.canGoForward;
       entry.bar.toggleAttribute("data-selected", gBrowser.selectedTab === tab);
+      applyTone(entry.bar, pageAppearanceByBrowser.get(browser));
     };
 
     const createSplitBar = tab => {
@@ -307,21 +587,21 @@
       const controls = document.createElementNS(HTML_NS, "div");
       controls.className = "floating-domain-split-controls";
 
-      const back = makeSplitButton("‹", "Geri", () => {
+      const back = makeSplitButton("back", "Geri", () => {
         activateTab(tab);
         if (tab.linkedBrowser.canGoBack) {
           tab.linkedBrowser.goBack();
         }
       });
-      const forward = makeSplitButton("›", "İleri", () => {
+      const forward = makeSplitButton("forward", "İleri", () => {
         activateTab(tab);
         if (tab.linkedBrowser.canGoForward) {
           tab.linkedBrowser.goForward();
         }
       });
-      const reload = makeSplitButton("↻", "Yenile", () => {
+      const reload = makeSplitButton("reload", "Yenile", () => {
         activateTab(tab);
-        tab.linkedBrowser.reload();
+        gBrowser.reloadTab(tab);
       });
       controls.append(back, forward, reload);
 
@@ -400,30 +680,26 @@
         let visibleLeft = panelRect.left;
         let visibleRight = panelRect.right;
 
-        if (
-          document.documentElement.getAttribute("zen-compact-mode") === "true"
-        ) {
-          const sidebarRect = sidebar.getBoundingClientRect();
+        const sidebarRect = sidebar.getBoundingClientRect();
 
-          if (document.documentElement.getAttribute("zen-right-side") === "true") {
-            if (
-              sidebarRect.left < visibleRight &&
-              sidebarRect.right >= panelRect.right
-            ) {
-              visibleRight = Math.max(
-                visibleLeft,
-                Math.min(visibleRight, sidebarRect.left)
-              );
-            }
-          } else if (
-            sidebarRect.right > visibleLeft &&
-            sidebarRect.left <= panelRect.left
+        if (document.documentElement.getAttribute("zen-right-side") === "true") {
+          if (
+            sidebarRect.left < visibleRight &&
+            sidebarRect.right >= panelRect.right
           ) {
-            visibleLeft = Math.min(
-              visibleRight,
-              Math.max(visibleLeft, sidebarRect.right)
+            visibleRight = Math.max(
+              visibleLeft,
+              Math.min(visibleRight, sidebarRect.left)
             );
           }
+        } else if (
+          sidebarRect.right > visibleLeft &&
+          sidebarRect.left <= panelRect.left
+        ) {
+          visibleLeft = Math.min(
+            visibleRight,
+            Math.max(visibleLeft, sidebarRect.right)
+          );
         }
 
         const visibleWidth = Math.max(0, visibleRight - visibleLeft);
@@ -431,7 +707,7 @@
         const sidePadding = visibleWidth < 360 ? 8 : 12;
         const rowWidth = Math.max(
           120,
-          Math.min(680, visibleWidth - sidePadding * 2)
+          Math.min(872, visibleWidth - sidePadding * 2)
         );
         const left =
           visibleLeft - hostRect.left + (visibleWidth - rowWidth) / 2;
@@ -444,6 +720,8 @@
         entry.bar.toggleAttribute("data-narrow", visibleWidth < 420);
         updateSplitBar(tab);
       }
+
+      refreshAppearance();
 
       for (const observed of observedSplitContainers) {
         if (!nextObserved.has(observed)) {
@@ -507,6 +785,18 @@
 
     const progressListener = {
       onLocationChange(browser, _webProgress, _request, locationURI) {
+        if (!_webProgress?.isTopLevel) {
+          return;
+        }
+
+        if (_webProgress.isLoadingDocument) {
+          const container = browser?.closest?.(".browserSidebarContainer");
+          container?.style.removeProperty("--floating-domain-page-color");
+          container?.removeAttribute("floating-domain-page-tone");
+          pageAppearanceByBrowser.delete(browser);
+          refreshAppearance();
+        }
+
         if (browser === gBrowser.selectedBrowser) {
           update(locationURI);
         }
@@ -527,6 +817,7 @@
 
     const onTabSelect = () => {
       update();
+      refreshAppearance();
       scheduleSplitSync();
     };
     const onTabChange = () => scheduleSplitSync(true);
@@ -600,6 +891,24 @@
       sidebarStateObserver.disconnect();
       splitResizeObserver.disconnect();
       splitMutationObserver.disconnect();
+
+      if (pageColorFrameScriptURL) {
+        try {
+          frameManager.removeMessageListener(PAGE_COLOR_MESSAGE, onPageColor);
+          frameManager.broadcastAsyncMessage(PAGE_COLOR_DESTROY_MESSAGE);
+          frameManager.removeDelayedFrameScript(pageColorFrameScriptURL);
+        } catch {
+          // The message manager may already be gone during shutdown.
+        }
+      }
+
+      for (const container of document.querySelectorAll(
+        ".browserSidebarContainer"
+      )) {
+        container.style.removeProperty("--floating-domain-page-color");
+        container.removeAttribute("floating-domain-page-tone");
+      }
+
       sidebar.removeEventListener("transitionrun", scheduleSidebarUpdate);
       sidebar.removeEventListener("transitionend", scheduleSidebarUpdate);
 
@@ -623,6 +932,12 @@
       );
       document.documentElement.removeAttribute(
         "floating-domain-bar-split-active"
+      );
+      document.documentElement.removeAttribute(
+        "floating-domain-bar-browser-layout"
+      );
+      document.documentElement.removeAttribute(
+        "floating-domain-page-tone"
       );
 
       for (const { node, parent, nextSibling } of originalPositions.reverse()) {

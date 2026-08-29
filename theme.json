@@ -1,18 +1,18 @@
 {
   "id": "floating-domain-bar",
   "name": "Floating Domain Bar",
-  "description": "Places responsive floating domain bars over Zen's content surface, including one independent search/address bar for every visible Split View tab.",
+  "description": "Adds a real top browser row with visible-edge color sampling and adaptive light/dark materials, without modifying website layouts.",
   "author": "efeba",
-  "version": "0.9.2",
+  "version": "0.17.1",
   "createdAt": "2026-08-29",
-  "updatedAt": "2026-08-29",
+  "updatedAt": "2026-08-30",
   "style": {
     "chrome": "userChrome.css"
   },
   "scripts": {
     "floating-domain-bar.uc.js": {
       "name": "Domain label",
-      "description": "Shows site domains and creates responsive per-panel search/address bars in Split View.",
+      "description": "Shows site domains, samples visible page-edge colors read-only and adapts each responsive Split View bar for contrast.",
       "include": [
         "chrome://browser/content/browser.xhtml"
       ]

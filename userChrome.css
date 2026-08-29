@@ -5,19 +5,62 @@
 
 :root {
   --floating-domain-bar-offset: 10px;
-  --floating-domain-bar-width: min(680px, 58vw);
+  --floating-domain-bar-window-controls-space: 184px;
+  --floating-domain-bar-width: max(
+    240px,
+    min(
+      680px,
+      58vw,
+      calc(100vw - var(--floating-domain-bar-sidebar-width) - 368px)
+    )
+  );
+  --floating-domain-bar-reserved-space: 52px;
   --floating-domain-bar-sidebar-width: 0px;
   --floating-domain-bar-control-gap: 3px;
   --floating-domain-bar-radius: 14px;
+  --floating-domain-bar-gutter: var(
+    --zen-main-browser-background,
+    var(--tabpanel-background-color, var(--toolbar-bgcolor))
+  );
+  --floating-domain-bar-filter: blur(28px) saturate(1.28);
+}
+
+:root,
+.floating-domain-split-bar[data-page-tone="dark"] {
+  --floating-domain-bar-foreground: rgba(255, 255, 255, 0.92);
+  --floating-domain-bar-glass: color-mix(
+    in srgb,
+    rgb(10, 10, 12) 90%,
+    transparent
+  );
+  --floating-domain-bar-solid: rgb(10, 10, 12);
+  --floating-domain-bar-border: rgba(255, 255, 255, 0.17);
   --floating-domain-bar-shadow:
-    0 10px 28px rgba(0, 0, 0, 0.18),
-    0 2px 8px rgba(0, 0, 0, 0.12);
+    0 14px 34px rgba(0, 0, 0, 0.28),
+    0 3px 10px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 color-mix(in srgb, white 9%, transparent);
+}
+
+:root[floating-domain-page-tone="light"],
+.floating-domain-split-bar[data-page-tone="light"] {
+  --floating-domain-bar-foreground: rgba(20, 20, 24, 0.9);
+  --floating-domain-bar-glass: color-mix(
+    in srgb,
+    rgb(250, 250, 252) 82%,
+    transparent
+  );
+  --floating-domain-bar-solid: rgb(250, 250, 252);
+  --floating-domain-bar-border: rgba(0, 0, 0, 0.18);
+  --floating-domain-bar-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 /*
- * Zen normally reserves a full horizontal row for the navigation toolbar.
- * Collapse that row and paint its contents over the page instead, so only the
- * floating field and its controls remain visible. Customize mode stays normal.
+ * Zen's own navbar row is collapsed, then each browser panel reserves a real
+ * chrome header before its web surface. Its color is sampled from that page;
+ * the web document itself is never changed.
  */
 :root:not([customizing]) #zen-appcontent-navbar-wrapper {
   position: relative !important;
@@ -52,6 +95,61 @@
   pointer-events: none !important;
 }
 
+/* Keep the native controls in Zen's own DOM, but give their real hit target a
+ * fixed window-relative box. A relative child of the zero-height navbar can
+ * be painted at the top while its click geometry still points lower down. */
+:root:not([customizing])
+  #zen-appcontent-navbar-wrapper
+  .titlebar-buttonbox-container {
+  position: fixed !important;
+  inset: 0 0 auto auto !important;
+  z-index: 1100 !important;
+  display: flex !important;
+  align-items: stretch !important;
+  width: auto !important;
+  height: 40px !important;
+  margin: 0 !important;
+  color: var(--floating-domain-bar-foreground) !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  -moz-window-dragging: no-drag !important;
+}
+
+:root:not([customizing])
+  #zen-appcontent-navbar-wrapper
+  .titlebar-buttonbox-container
+  .titlebar-buttonbox {
+  position: static !important;
+  display: flex !important;
+  align-items: stretch !important;
+  height: 40px !important;
+  margin: 0 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+}
+
+:root:not([customizing])
+  #zen-appcontent-navbar-wrapper
+  .titlebar-buttonbox-container
+  .titlebar-button {
+  position: static !important;
+  height: 40px !important;
+  margin: 0 !important;
+  color: inherit !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  -moz-window-dragging: no-drag !important;
+}
+
+:root:not([customizing])
+  #zen-appcontent-navbar-wrapper
+  .titlebar-buttonbox-container
+  .titlebar-button
+  > image {
+  color: inherit !important;
+  fill: currentColor !important;
+}
+
 /* Once JS relocates the useful controls, suppress the now-empty toolbar row. */
 :root[floating-domain-bar-layout-ready]:not([customizing])
   #nav-bar
@@ -66,19 +164,41 @@
   position: relative !important;
 }
 
-/* This grid lives inside the web-content box, so its middle is always exact. */
+:root:not([customizing])
+  #tabbrowser-tabpanels
+  .browserSidebarContainer {
+  box-sizing: border-box !important;
+  padding-block-start: var(--floating-domain-bar-reserved-space) !important;
+  background-color: var(
+    --floating-domain-page-color,
+    var(--floating-domain-bar-gutter)
+  ) !important;
+}
+
+/* Full-width chrome row; only its centered address field has a surface. */
 #floating-domain-bar-layout {
   position: absolute !important;
   inset: var(--floating-domain-bar-offset) 0 auto !important;
   z-index: 1000 !important;
   display: grid !important;
   grid-template-columns:
+    var(--floating-domain-bar-window-controls-space)
     minmax(0, 1fr)
     var(--floating-domain-bar-width)
-    minmax(0, 1fr) !important;
+    minmax(0, 1fr)
+    var(--floating-domain-bar-window-controls-space) !important;
   align-items: center !important;
+  box-sizing: border-box !important;
   width: 100% !important;
   height: 32px !important;
+  padding: 0 !important;
+  color: var(--floating-domain-bar-foreground) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  transform: none !important;
   pointer-events: none !important;
 }
 
@@ -106,12 +226,25 @@
 .floating-domain-split-bar {
   position: absolute;
   box-sizing: border-box;
-  display: flex;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 96px;
   align-items: center;
-  gap: 7px;
   height: 32px;
   min-width: 0;
+  padding: 0;
+  color: var(--floating-domain-bar-foreground);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
   pointer-events: none;
+}
+
+.floating-domain-split-bar::after {
+  content: "";
+  display: block;
+  width: 96px;
 }
 
 .floating-domain-split-bar[hidden] {
@@ -122,11 +255,15 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 2px;
+  justify-content: flex-end;
+  gap: var(--floating-domain-bar-control-gap);
+  padding-inline-end: 7px;
   pointer-events: auto;
+  -moz-window-dragging: no-drag;
 }
 
 .floating-domain-split-button {
+  position: relative;
   box-sizing: border-box;
   display: grid;
   place-items: center;
@@ -136,27 +273,63 @@
   margin: 0;
   padding: 0;
   appearance: none;
-  color: color-mix(in srgb, currentColor 80%, transparent);
-  font: menu;
-  font-size: 21px;
-  line-height: 1;
-  background: color-mix(
-    in srgb,
-    var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) 80%,
-    transparent
-  );
-  border: 1px solid color-mix(in srgb, currentColor 10%, transparent);
-  border-radius: 10px;
-  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(16px) saturate(1.1);
+  color: color-mix(in srgb, currentColor 82%, transparent);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: none;
   cursor: default;
+  pointer-events: auto !important;
+  -moz-window-dragging: no-drag !important;
+}
+
+.floating-domain-split-button::before {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+
+.floating-domain-split-button[data-action="back"]::before,
+.floating-domain-split-button[data-action="forward"]::before {
+  border-block-end: 1.8px solid currentColor;
+  border-inline-start: 1.8px solid currentColor;
+}
+
+.floating-domain-split-button[data-action="back"]::before {
+  transform: rotate(45deg);
+}
+
+.floating-domain-split-button[data-action="forward"]::before {
+  transform: rotate(225deg);
+}
+
+.floating-domain-split-button[data-action="reload"]::before {
+  width: 14px;
+  height: 14px;
+  border: 1.8px solid currentColor;
+  border-inline-start-color: transparent;
+  border-radius: 50%;
+  transform: rotate(-35deg);
+}
+
+.floating-domain-split-button[data-action="reload"]::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  margin: -10px 0 0 -9px;
+  border-block: 3px solid transparent;
+  border-inline-end: 5px solid currentColor;
 }
 
 .floating-domain-split-button:hover:not(:disabled) {
   background: color-mix(
     in srgb,
-    var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) 94%,
-    currentColor 6%
+    currentColor 10%,
+    transparent
   );
 }
 
@@ -171,19 +344,43 @@
   min-width: 0;
   height: 32px;
   overflow: hidden;
-  background: color-mix(
-    in srgb,
-    var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) 88%,
-    transparent
-  );
-  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  background: var(--floating-domain-bar-glass);
+  border: 1px solid var(--floating-domain-bar-border);
   border-radius: var(--floating-domain-bar-radius);
   box-shadow: var(--floating-domain-bar-shadow);
-  backdrop-filter: blur(18px) saturate(1.15);
+  backdrop-filter: var(--floating-domain-bar-filter);
   pointer-events: auto;
+  -moz-window-dragging: no-drag;
   transition:
     border-color 120ms ease,
-    box-shadow 120ms ease;
+  box-shadow 120ms ease;
+}
+
+.floating-domain-split-input-shell::before {
+  content: "";
+  position: absolute;
+  inset: 10px auto auto 12px;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 1.6px solid color-mix(in srgb, currentColor 68%, transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.floating-domain-split-input-shell::after {
+  content: "";
+  position: absolute;
+  inset: 20px auto auto 21px;
+  z-index: 1;
+  width: 5px;
+  height: 1.6px;
+  background: color-mix(in srgb, currentColor 68%, transparent);
+  border-radius: 2px;
+  transform: rotate(45deg);
+  transform-origin: left center;
+  pointer-events: none;
 }
 
 .floating-domain-split-bar[data-selected]
@@ -202,10 +399,10 @@
   height: 100%;
   min-width: 0;
   margin: 0;
-  padding: 0 13px;
+  padding: 0 38px;
   appearance: none;
   color: color-mix(in srgb, currentColor 84%, transparent);
-  font: menu;
+  font: inherit;
   font-weight: 600;
   line-height: 32px;
   text-align: center;
@@ -221,7 +418,7 @@
 }
 
 .floating-domain-split-bar[data-narrow] {
-  gap: 0;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .floating-domain-split-bar[data-narrow]
@@ -229,8 +426,12 @@
   display: none;
 }
 
+.floating-domain-split-bar[data-narrow]::after {
+  display: none;
+}
+
 /* Compact Mode overlays the sidebar on a full-width page. Counter that shift
- * so Ctrl+S never changes the bar's on-screen center. */
+ * so Ctrl+S never changes the row's web-area center. */
 :root[zen-compact-mode="true"]:not([zen-right-side="true"]):not([customizing])
   #floating-domain-bar-layout {
   transform: translateX(
@@ -255,12 +456,14 @@
 }
 
 #floating-domain-bar-left-controls {
+  grid-column: 2 !important;
   justify-self: end !important;
   justify-content: flex-end !important;
   padding-inline-end: 7px !important;
 }
 
 #floating-domain-bar-right-controls {
+  grid-column: 4 !important;
   justify-self: start !important;
   justify-content: flex-start !important;
   padding-inline-start: 7px !important;
@@ -284,6 +487,8 @@
 
 #floating-domain-bar-layout .toolbarbutton-icon {
   display: block !important;
+  color: inherit !important;
+  fill: currentColor !important;
 }
 
 #floating-domain-bar-layout #back-button,
@@ -300,7 +505,7 @@
 #floating-domain-bar-layout #urlbar-container {
   position: relative !important;
   inset: auto !important;
-  grid-column: 2 !important;
+  grid-column: 3 !important;
   flex: none !important;
   width: 100% !important;
   max-width: none !important;
@@ -308,6 +513,14 @@
   margin: 0 !important;
   transform: none !important;
   z-index: 100 !important;
+}
+
+#floating-domain-bar-layout #urlbar-container,
+#floating-domain-bar-layout #urlbar {
+  --toolbar-field-color: var(--floating-domain-bar-foreground) !important;
+  --toolbar-field-focus-color: var(--floating-domain-bar-foreground) !important;
+  --urlbarView-highlight-color: var(--floating-domain-bar-foreground) !important;
+  color: var(--floating-domain-bar-foreground) !important;
 }
 
 /* Zen's Ctrl+S Compact Mode must not hide or fade this persistent bar. */
@@ -327,15 +540,11 @@
 
 #urlbar:not([breakout-extend]) > .urlbar-background,
 #urlbar:not([breakout-extend]) > #urlbar-background {
-  background-color: color-mix(
-    in srgb,
-    var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) 88%,
-    transparent
-  ) !important;
-  border: 1px solid color-mix(in srgb, currentColor 12%, transparent) !important;
+  background-color: var(--floating-domain-bar-glass) !important;
+  border: 1px solid var(--floating-domain-bar-border) !important;
   border-radius: var(--floating-domain-bar-radius) !important;
   box-shadow: var(--floating-domain-bar-shadow) !important;
-  backdrop-filter: blur(18px) saturate(1.15) !important;
+  backdrop-filter: var(--floating-domain-bar-filter) !important;
 }
 
 #urlbar:not([breakout-extend]) {
@@ -403,9 +612,8 @@
 @media (prefers-reduced-transparency: reduce) {
   #urlbar:not([breakout-extend]) > .urlbar-background,
   #urlbar:not([breakout-extend]) > #urlbar-background,
-  .floating-domain-split-input-shell,
-  .floating-domain-split-button {
-    background-color: var(--zen-toolbar-element-bg, var(--toolbar-bgcolor)) !important;
+  .floating-domain-split-input-shell {
+    background-color: var(--floating-domain-bar-solid) !important;
     backdrop-filter: none !important;
   }
 }
@@ -413,7 +621,15 @@
 /* Avoid crushing the field in narrow windows. */
 @media (max-width: 760px) {
   :root {
-    --floating-domain-bar-width: min(520px, 72vw);
+    --floating-domain-bar-window-controls-space: 144px;
+    --floating-domain-bar-width: max(
+      240px,
+      min(
+        520px,
+        72vw,
+        calc(100vw - var(--floating-domain-bar-sidebar-width) - 288px)
+      )
+    );
   }
 
   #urlbar-container {
