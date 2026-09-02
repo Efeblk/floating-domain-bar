@@ -18,6 +18,7 @@
   --floating-domain-bar-sidebar-width: 0px;
   --floating-domain-bar-control-gap: 3px;
   --floating-domain-bar-radius: 14px;
+  --floating-domain-bar-outer-foreground: rgb(116, 116, 122);
   --floating-domain-bar-gutter: var(
     --zen-main-browser-background,
     var(--tabpanel-background-color, var(--toolbar-bgcolor))
@@ -27,6 +28,7 @@
 
 :root,
 .floating-domain-split-bar[data-page-tone="dark"] {
+  --floating-domain-load-color: #64adff;
   --floating-domain-bar-foreground: rgba(255, 255, 255, 0.92);
   --floating-domain-bar-glass: color-mix(
     in srgb,
@@ -43,6 +45,7 @@
 
 :root[floating-domain-page-tone="light"],
 .floating-domain-split-bar[data-page-tone="light"] {
+  --floating-domain-load-color: #007aff;
   --floating-domain-bar-foreground: rgba(20, 20, 24, 0.9);
   --floating-domain-bar-glass: color-mix(
     in srgb,
@@ -55,6 +58,14 @@
     0 12px 30px rgba(0, 0, 0, 0.18),
     0 2px 8px rgba(0, 0, 0, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+:root[floating-domain-page-tone="dark"] {
+  --floating-domain-bar-outer-foreground: rgba(248, 248, 250, 0.86);
+}
+
+:root[floating-domain-page-tone="light"] {
+  --floating-domain-bar-outer-foreground: rgba(22, 22, 26, 0.82);
 }
 
 /*
@@ -109,7 +120,7 @@
   width: auto !important;
   height: 40px !important;
   margin: 0 !important;
-  color: var(--floating-domain-bar-foreground) !important;
+  color: var(--floating-domain-bar-outer-foreground) !important;
   pointer-events: auto !important;
   transform: none !important;
   -moz-window-dragging: no-drag !important;
@@ -156,8 +167,35 @@
   > :not(#nav-bar-customization-target):not(.titlebar-buttonbox-container),
 :root[floating-domain-bar-layout-ready]:not([customizing])
   #nav-bar-customization-target
-  > * {
+  > :not(#urlbar-container) {
   display: none !important;
+}
+
+/* Keep Zen's real URL bar in its original toolbar. It stays visually dormant
+ * until Zen itself promotes it to the independent floating editor. */
+:root[floating-domain-bar-layout-ready]:not([customizing]) #urlbar-container {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 40px !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  -moz-window-dragging: no-drag !important;
+}
+
+:root[floating-domain-bar-layout-ready]:not([customizing])
+  #urlbar-container
+  #urlbar:not([zen-floating-urlbar="true"]) {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+:root[floating-domain-bar-layout-ready]:not([customizing])
+  #urlbar-container:has(#urlbar[zen-floating-urlbar="true"]) {
+  pointer-events: auto !important;
 }
 
 :root:not([customizing]) #tabbrowser-tabbox {
@@ -173,6 +211,26 @@
     --floating-domain-page-color,
     var(--floating-domain-bar-gutter)
   ) !important;
+}
+
+/* A real, transparent XUL hit target makes the reserved chrome header behave
+ * like a native Windows title bar. Interactive controls render above it. */
+#floating-domain-bar-drag-region {
+  position: absolute !important;
+  inset: 0 0 auto !important;
+  z-index: 999 !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: var(--floating-domain-bar-reserved-space) !important;
+  background: transparent !important;
+  pointer-events: auto !important;
+  -moz-window-dragging: no-drag !important;
+}
+
+:root[floating-domain-bar-window-dragging] {
+  cursor: default !important;
+  user-select: none !important;
 }
 
 /* Full-width chrome row; only its centered address field has a surface. */
@@ -210,6 +268,13 @@
   pointer-events: none !important;
 }
 
+/* A split domain pill opens Zen's one native floating editor. Lift its native
+ * toolbar layer over the per-panel chrome without moving the URL bar's DOM. */
+:root[floating-domain-bar-native-open]:not([customizing])
+  #zen-appcontent-navbar-wrapper {
+  z-index: 1200 !important;
+}
+
 #floating-domain-split-layer {
   position: absolute;
   inset: 0;
@@ -239,6 +304,10 @@
   box-shadow: none;
   backdrop-filter: none;
   pointer-events: none;
+  transition:
+    left 150ms ease,
+    top 150ms ease,
+    width 150ms ease;
 }
 
 .floating-domain-split-bar::after {
@@ -412,11 +481,6 @@
   outline: 0;
 }
 
-.floating-domain-split-input[data-editing="true"] {
-  font-weight: 400;
-  text-align: start;
-}
-
 .floating-domain-split-bar[data-narrow] {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -453,6 +517,7 @@
   gap: var(--floating-domain-bar-control-gap) !important;
   min-width: 0 !important;
   pointer-events: none !important;
+  -moz-window-dragging: no-drag !important;
 }
 
 #floating-domain-bar-left-controls {
@@ -472,12 +537,30 @@
 #floating-domain-bar-layout #back-button,
 #floating-domain-bar-layout #forward-button,
 #floating-domain-bar-layout #stop-reload-button,
-#floating-domain-bar-layout #PanelUI-button,
-#floating-domain-bar-layout #urlbar {
+#floating-domain-bar-layout #PanelUI-button {
   position: static !important;
   inset: auto !important;
   margin: 0 !important;
   transform: none !important;
+  pointer-events: auto !important;
+  -moz-window-dragging: no-drag !important;
+}
+
+/* In Split View the native editor remains one shared Zen component, but its
+ * geometry follows the selected panel so it behaves like that panel's bar. */
+:root[floating-domain-bar-native-open]
+  #urlbar[open][zen-floating-urlbar="true"] {
+  position: fixed !important;
+  inset: var(--floating-domain-native-top) auto auto
+    var(--floating-domain-native-left) !important;
+  width: var(--floating-domain-native-width) !important;
+  min-width: var(--floating-domain-native-width) !important;
+  max-width: none !important;
+  translate: -50% 0 !important;
+  transform: none !important;
+  z-index: 1200 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   pointer-events: auto !important;
 }
 
@@ -491,6 +574,21 @@
   fill: currentColor !important;
 }
 
+/* Controls follow the sampled page tone. Neutral gray remains the safe
+ * fallback until a page color is available. */
+#floating-domain-bar-left-controls .toolbarbutton-icon,
+#floating-domain-bar-right-controls .toolbarbutton-icon,
+:root:not([customizing])
+  #zen-appcontent-navbar-wrapper
+  .titlebar-buttonbox-container
+  .titlebar-button
+  > image {
+  color: var(--floating-domain-bar-outer-foreground) !important;
+  fill: currentColor !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+}
+
 #floating-domain-bar-layout #back-button,
 #floating-domain-bar-layout #forward-button,
 #floating-domain-bar-layout #stop-reload-button,
@@ -499,28 +597,67 @@
   width: 32px !important;
   min-width: 32px !important;
   max-width: 32px !important;
+  color: var(--floating-domain-bar-outer-foreground) !important;
+  fill: var(--floating-domain-bar-outer-foreground) !important;
+  --toolbarbutton-icon-fill: var(--floating-domain-bar-outer-foreground) !important;
+  --toolbarbutton-icon-fill-attention: var(
+    --floating-domain-bar-outer-foreground
+  ) !important;
 }
 
-/* The address field occupies the exact center column of the content grid. */
-#floating-domain-bar-layout #urlbar-container {
+/* The visible domain pill is deliberately separate from Zen's real URL bar. */
+#floating-domain-bar-domain {
   position: relative !important;
-  inset: auto !important;
   grid-column: 3 !important;
-  flex: none !important;
+  box-sizing: border-box !important;
+  display: block !important;
   width: 100% !important;
-  max-width: none !important;
+  height: 32px !important;
   min-width: 0 !important;
   margin: 0 !important;
-  transform: none !important;
-  z-index: 100 !important;
+  padding: 0 38px !important;
+  appearance: none !important;
+  color: var(--floating-domain-bar-foreground) !important;
+  font: inherit !important;
+  background: var(--floating-domain-bar-glass) !important;
+  border: 1px solid var(--floating-domain-bar-border) !important;
+  border-radius: var(--floating-domain-bar-radius) !important;
+  box-shadow: var(--floating-domain-bar-shadow) !important;
+  backdrop-filter: var(--floating-domain-bar-filter) !important;
+  cursor: default !important;
+  pointer-events: auto !important;
+  -moz-window-dragging: no-drag !important;
 }
 
-#floating-domain-bar-layout #urlbar-container,
-#floating-domain-bar-layout #urlbar {
-  --toolbar-field-color: var(--floating-domain-bar-foreground) !important;
-  --toolbar-field-focus-color: var(--floating-domain-bar-foreground) !important;
-  --urlbarView-highlight-color: var(--floating-domain-bar-foreground) !important;
-  color: var(--floating-domain-bar-foreground) !important;
+#floating-domain-bar-domain::before {
+  content: "";
+  position: absolute;
+  inset: 10px auto auto 12px;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 1.6px solid color-mix(in srgb, currentColor 68%, transparent);
+  border-radius: 50%;
+}
+
+#floating-domain-bar-domain::after {
+  content: "";
+  position: absolute;
+  inset: 20px auto auto 21px;
+  width: 5px;
+  height: 1.6px;
+  background: color-mix(in srgb, currentColor 68%, transparent);
+  border-radius: 2px;
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+#floating-domain-bar-domain:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--zen-primary-color, AccentColor) 42%,
+    var(--floating-domain-bar-border)
+  ) !important;
 }
 
 /* Zen's Ctrl+S Compact Mode must not hide or fade this persistent bar. */
@@ -531,87 +668,74 @@
   opacity: 1 !important;
 }
 
-:root[zen-compact-mode="true"]:not([customizing])
-  #urlbar:not([breakout-extend]) {
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
-
-#urlbar:not([breakout-extend]) > .urlbar-background,
-#urlbar:not([breakout-extend]) > #urlbar-background {
-  background-color: var(--floating-domain-bar-glass) !important;
-  border: 1px solid var(--floating-domain-bar-border) !important;
-  border-radius: var(--floating-domain-bar-radius) !important;
-  box-shadow: var(--floating-domain-bar-shadow) !important;
-  backdrop-filter: var(--floating-domain-bar-filter) !important;
-}
-
-#urlbar:not([breakout-extend]) {
-  border-radius: var(--floating-domain-bar-radius) !important;
-}
-
-/* Keep Zen's expanded editor near the ceiling too. */
-#urlbar[open][zen-floating-urlbar="true"] {
-  top: calc(var(--floating-domain-bar-offset) + 6px) !important;
-}
-
-/* The script places this harmless visual label over the untouched URL input. */
-#urlbar .urlbar-input-box {
-  position: relative !important;
-}
-
 #floating-domain-bar-label {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   min-width: 0;
-  padding-inline: 12px;
   overflow: hidden;
   color: color-mix(in srgb, currentColor 82%, transparent);
   font: inherit;
   font-weight: 600;
-  line-height: 1;
+  line-height: 30px;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* Safari-like loading line, clipped inside each pill instead of spanning the
+ * window. Keep it decorative so the domain/editor remains the click target. */
+.floating-domain-load-track {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  overflow: hidden;
+  border-radius: inherit;
   opacity: 0;
-  transition: opacity 120ms ease;
+  pointer-events: none !important;
+  transition: opacity 160ms ease;
 }
 
-/* Hide only the painted URL while idle. Its actual value remains unchanged. */
-#urlbar:not([focused]):not([open]):not([usertyping]):not([breakout-extend])
-  #urlbar-input {
-  color: transparent !important;
-  caret-color: transparent !important;
-  text-shadow: none !important;
-}
-
-#urlbar:not([focused]):not([open]):not([usertyping]):not([breakout-extend])
-  #urlbar-scheme {
-  visibility: hidden !important;
-}
-
-#urlbar:not([focused]):not([open]):not([usertyping]):not([breakout-extend])
-  #floating-domain-bar-label:not(:empty) {
+.floating-domain-load-track[data-load-state="loading"],
+.floating-domain-load-track[data-load-state="complete"] {
   opacity: 1;
+}
+
+.floating-domain-load-fill {
+  position: absolute;
+  inset: auto 0 0;
+  display: block;
+  height: 2px;
+  background: var(--floating-domain-load-color, #64adff);
+  box-shadow: 0 -1px 5px color-mix(
+    in srgb, var(--floating-domain-load-color, #64adff) 35%, transparent
+  );
+  transform: scaleX(var(--floating-domain-load-progress, 0));
+  transform-origin: left center;
+  pointer-events: none !important;
+  transition: transform 240ms ease-out;
+}
+
+@media (forced-colors: active) {
+  .floating-domain-load-fill {
+    background: Highlight;
+    box-shadow: none;
+  }
 }
 
 /* Respect users who disable animation or transparency. */
 @media (prefers-reduced-motion: reduce) {
   #floating-domain-bar-label,
-  .floating-domain-split-input-shell {
+  .floating-domain-split-bar,
+  .floating-domain-split-input-shell,
+  .floating-domain-load-track,
+  .floating-domain-load-fill {
     transition: none;
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  #urlbar:not([breakout-extend]) > .urlbar-background,
-  #urlbar:not([breakout-extend]) > #urlbar-background,
+  #floating-domain-bar-domain,
   .floating-domain-split-input-shell {
     background-color: var(--floating-domain-bar-solid) !important;
     backdrop-filter: none !important;
@@ -630,9 +754,5 @@
         calc(100vw - var(--floating-domain-bar-sidebar-width) - 288px)
       )
     );
-  }
-
-  #urlbar-container {
-    flex-basis: 520px !important;
   }
 }

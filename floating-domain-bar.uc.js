@@ -4,8 +4,10 @@
   const STATE_KEY = "__floatingDomainBarState";
   const LABEL_ID = "floating-domain-bar-label";
   const LAYOUT_ID = "floating-domain-bar-layout";
+  const DRAG_REGION_ID = "floating-domain-bar-drag-region";
   const SPLIT_LAYER_ID = "floating-domain-split-layer";
   const PAGE_COLOR_MESSAGE = "FloatingDomainBar:PageColor";
+  const PAGE_COLOR_REQUEST_MESSAGE = "FloatingDomainBar:RequestPageColor";
   const PAGE_COLOR_DESTROY_MESSAGE = "FloatingDomainBar:DestroyPageColorSampler";
   const HTML_NS = "http://www.w3.org/1999/xhtml";
 
@@ -53,15 +55,170 @@
     return spec || scheme;
   }
 
-  function editableValueForURI(uri) {
-    const spec = uri?.displaySpec ?? uri?.spec ?? "";
-    return /^about:(?:blank|home|newtab)(?:[?#].*)?$/i.test(spec) ? "" : spec;
+  // Page-load progress, not background fetch/media activity. Unknown byte totals
+  // use a bounded estimate; only a successful network STOP can fill the line.
+  function createLoadingTracker({
+    onChange,
+    timers = window,
+    flags = Ci.nsIWebProgressListener,
+    isSuccess = status => Components.isSuccessCode(status),
+  }) {
+    const states = new Map();
+    let nextId = 0;
+    let destroyed = false;
+
+    const cancelTimer = state => {
+      if (state?.timer) {
+        timers.clearTimeout(state.timer);
+        state.timer = 0;
+      }
+    };
+    const forget = browser => {
+      cancelTimer(states.get(browser));
+      if (states.delete(browser)) {
+        onChange(browser);
+      }
+    };
+    const schedule = (browser, state, callback, delay) => {
+      cancelTimer(state);
+      state.timer = timers.setTimeout(() => {
+        state.timer = 0;
+        if (!destroyed && states.get(browser) === state) {
+          callback();
+        }
+      }, delay);
+    };
+    const advance = (browser, state) => {
+      if (browser.isConnected === false) {
+        forget(browser);
+        return;
+      }
+      if (state.progress < 0.88) {
+        state.progress = Math.min(
+          0.88,
+          state.progress + Math.max(0.002, (0.88 - state.progress) * 0.08)
+        );
+        onChange(browser);
+        schedule(browser, state, () => advance(browser, state), 350);
+      }
+    };
+    const start = (browser, request = null) => {
+      if (destroyed || !browser) {
+        return;
+      }
+      const previous = states.get(browser);
+      if (previous?.phase === "loading" && previous.request === request) {
+        return;
+      }
+      cancelTimer(previous);
+      const state = {
+        id: ++nextId,
+        phase: "loading",
+        progress: 0.06,
+        request,
+        timer: 0,
+      };
+      states.set(browser, state);
+      onChange(browser);
+      schedule(browser, state, () => advance(browser, state), 350);
+    };
+    const finish = (browser, successful) => {
+      const state = states.get(browser);
+      if (!state || state.phase !== "loading") {
+        return;
+      }
+      cancelTimer(state);
+      const fade = () => {
+        state.phase = "fading";
+        onChange(browser);
+        schedule(browser, state, () => forget(browser), 180);
+      };
+      if (!successful) {
+        fade();
+        return;
+      }
+      state.progress = 1;
+      state.phase = "complete";
+      onChange(browser);
+      schedule(browser, state, fade, 280);
+    };
+
+    return {
+      get: browser => states.get(browser),
+      forget,
+      seed(browser) {
+        if (browser?.webProgress?.isLoadingDocument && !states.has(browser)) {
+          start(browser);
+        }
+      },
+      onStateChange(browser, webProgress, request, stateFlags, status) {
+        if (!webProgress?.isTopLevel || !(stateFlags & flags.STATE_IS_NETWORK)) {
+          return;
+        }
+        if (stateFlags & flags.STATE_START) {
+          start(browser, request);
+        } else if (
+          stateFlags & flags.STATE_STOP &&
+          !webProgress.isLoadingDocument
+        ) {
+          // An obsolete STOP during a replacement navigation must not finish
+          // the new document's indicator.
+          finish(browser, isSuccess(status));
+        }
+      },
+      onProgressChange(browser, webProgress, current, maximum) {
+        const state = states.get(browser);
+        if (
+          !webProgress?.isTopLevel ||
+          state?.phase !== "loading" ||
+          !Number.isFinite(current) ||
+          !Number.isFinite(maximum) ||
+          current < 0 || maximum <= 0
+        ) {
+          return;
+        }
+        const progress = Math.min(0.94, Math.max(0.06, current / maximum));
+        if (progress > state.progress) {
+          state.progress = progress;
+          onChange(browser);
+        }
+      },
+      destroy() {
+        destroyed = true;
+        for (const state of states.values()) {
+          cancelTimer(state);
+        }
+        states.clear();
+      },
+    };
+  }
+
+  function createLoadingIndicator() {
+    const track = document.createElementNS(HTML_NS, "span");
+    track.className = "floating-domain-load-track";
+    track.setAttribute("aria-hidden", "true");
+    return { track, loadId: null };
+  }
+
+  function renderLoadingIndicator(indicator, state) {
+    // A new fill avoids animating backwards when switching tabs or rapidly
+    // reloading. The indicator never takes pointer or keyboard focus.
+    if (state && indicator.loadId !== state.id) {
+      const fill = document.createElementNS(HTML_NS, "span");
+      fill.className = "floating-domain-load-fill";
+      indicator.track.replaceChildren(fill);
+      indicator.loadId = state.id;
+    }
+    indicator.track.dataset.loadState = state?.phase || "idle";
+    indicator.track.style.setProperty(
+      "--floating-domain-load-progress",
+      String(state?.progress || 0)
+    );
   }
 
   function init() {
     const urlbar = document.getElementById("urlbar");
     const urlbarContainer = document.getElementById("urlbar-container");
-    const inputBox = urlbar?.querySelector(".urlbar-input-box");
     const contentHost = document.getElementById("tabbrowser-tabbox");
     const tabPanels = document.getElementById("tabbrowser-tabpanels");
     const sidebar = document.getElementById("navigator-toolbox");
@@ -73,7 +230,6 @@
     if (
       !urlbar ||
       !urlbarContainer ||
-      !inputBox ||
       !contentHost ||
       !tabPanels ||
       !sidebar ||
@@ -86,20 +242,10 @@
       return false;
     }
 
-    let label = document.getElementById(LABEL_ID);
-
-    if (!label) {
-      label = document.createElementNS(HTML_NS, "span");
-      label.id = LABEL_ID;
-      label.setAttribute("aria-hidden", "true");
-      inputBox.appendChild(label);
-    }
-
     const movedNodes = [
       backButton,
       forwardButton,
       stopReloadButton,
-      urlbarContainer,
       panelButton,
     ];
     const originalPositions = movedNodes.map(node => ({
@@ -107,6 +253,192 @@
       parent: node.parentNode,
       nextSibling: node.nextSibling,
     }));
+
+    const dragRegion = document.createXULElement("hbox");
+    dragRegion.id = DRAG_REGION_ID;
+    dragRegion.setAttribute("aria-hidden", "true");
+
+    let windowDragState = null;
+    let windowRestoreFrame = 0;
+
+    const stopWindowDrag = event => {
+      const state = windowDragState;
+
+      if (!state) {
+        return;
+      }
+
+      windowDragState = null;
+
+      if (windowRestoreFrame) {
+        window.cancelAnimationFrame(windowRestoreFrame);
+        windowRestoreFrame = 0;
+      }
+
+      try {
+        if (dragRegion.hasPointerCapture?.(state.pointerId)) {
+          dragRegion.releasePointerCapture(state.pointerId);
+        }
+      } catch {
+        // Pointer capture may already be released by the platform.
+      }
+
+      window.removeEventListener("pointermove", onWindowDragMove, true);
+      window.removeEventListener("pointerup", stopWindowDrag, true);
+      window.removeEventListener("pointercancel", stopWindowDrag, true);
+      document.documentElement.removeAttribute(
+        "floating-domain-bar-window-dragging"
+      );
+
+      if (state.started) {
+        event?.preventDefault?.();
+      }
+    };
+
+    const moveWindowToPointer = state => {
+      if (windowDragState !== state) {
+        return;
+      }
+
+      window.moveTo(
+        Math.round(state.lastScreenX - state.anchorX),
+        Math.round(state.lastScreenY - state.anchorY)
+      );
+    };
+
+    const finishWindowRestore = state => {
+      if (windowDragState !== state) {
+        return;
+      }
+
+      if (
+        window.windowState !== window.STATE_NORMAL &&
+        state.restoreAttempts < 4
+      ) {
+        state.restoreAttempts += 1;
+        windowRestoreFrame = window.requestAnimationFrame(() =>
+          finishWindowRestore(state)
+        );
+        return;
+      }
+
+      windowRestoreFrame = 0;
+      state.pendingRestore = false;
+      state.anchorX = Math.round(
+        window.outerWidth * state.horizontalPointerRatio
+      );
+      state.anchorY = Math.min(24, Math.max(8, state.initialClientY));
+      moveWindowToPointer(state);
+    };
+
+    function onWindowDragMove(event) {
+      const state = windowDragState;
+
+      if (!state || event.pointerId !== state.pointerId) {
+        return;
+      }
+
+      if (!(event.buttons & 1)) {
+        stopWindowDrag(event);
+        return;
+      }
+
+      state.lastScreenX = event.screenX;
+      state.lastScreenY = event.screenY;
+
+      if (!state.started) {
+        const distance = Math.hypot(
+          event.screenX - state.startScreenX,
+          event.screenY - state.startScreenY
+        );
+
+        if (distance < 4) {
+          return;
+        }
+
+        state.started = true;
+        document.documentElement.setAttribute(
+          "floating-domain-bar-window-dragging",
+          "true"
+        );
+
+        if (state.wasMaximized) {
+          state.pendingRestore = true;
+          window.restore();
+          windowRestoreFrame = window.requestAnimationFrame(() =>
+            finishWindowRestore(state)
+          );
+          event.preventDefault();
+          return;
+        }
+      }
+
+      if (!state.pendingRestore) {
+        moveWindowToPointer(state);
+      }
+
+      event.preventDefault();
+    }
+
+    const onWindowDragStart = event => {
+      if (
+        event.button !== 0 ||
+        !event.isPrimary ||
+        window.fullScreen ||
+        window.windowState === window.STATE_FULLSCREEN
+      ) {
+        return;
+      }
+
+      stopWindowDrag();
+
+      const wasMaximized = window.windowState === window.STATE_MAXIMIZED;
+      windowDragState = {
+        pointerId: event.pointerId,
+        startScreenX: event.screenX,
+        startScreenY: event.screenY,
+        lastScreenX: event.screenX,
+        lastScreenY: event.screenY,
+        initialClientY: event.clientY,
+        horizontalPointerRatio: Math.max(
+          0,
+          Math.min(1, event.clientX / Math.max(1, window.innerWidth))
+        ),
+        anchorX: event.screenX - window.screenX,
+        anchorY: event.screenY - window.screenY,
+        wasMaximized,
+        pendingRestore: false,
+        restoreAttempts: 0,
+        started: false,
+      };
+
+      try {
+        dragRegion.setPointerCapture?.(event.pointerId);
+      } catch {
+        // Window-level listeners still provide a safe fallback.
+      }
+
+      window.addEventListener("pointermove", onWindowDragMove, true);
+      window.addEventListener("pointerup", stopWindowDrag, true);
+      window.addEventListener("pointercancel", stopWindowDrag, true);
+    };
+
+    const onWindowDragDoubleClick = event => {
+      if (event.button !== 0 || window.fullScreen) {
+        return;
+      }
+
+      if (window.windowState === window.STATE_MAXIMIZED) {
+        window.restore();
+      } else {
+        window.maximize();
+      }
+
+      event.preventDefault();
+    };
+
+    dragRegion.addEventListener("pointerdown", onWindowDragStart);
+    dragRegion.addEventListener("dblclick", onWindowDragDoubleClick);
 
     const layout = document.createXULElement("hbox");
     layout.id = LAYOUT_ID;
@@ -117,10 +449,22 @@
     const rightControls = document.createXULElement("hbox");
     rightControls.id = "floating-domain-bar-right-controls";
 
+    const domainButton = document.createElementNS(HTML_NS, "button");
+    domainButton.id = "floating-domain-bar-domain";
+    domainButton.type = "button";
+    domainButton.setAttribute("aria-label", "Ara veya adres gir");
+
+    const label = document.createElementNS(HTML_NS, "span");
+    label.id = LABEL_ID;
+    label.setAttribute("aria-hidden", "true");
+    domainButton.appendChild(label);
+    const domainLoading = createLoadingIndicator();
+    domainButton.appendChild(domainLoading.track);
+
     leftControls.append(backButton, forwardButton, stopReloadButton);
     rightControls.append(panelButton);
-    layout.append(leftControls, urlbarContainer, rightControls);
-    contentHost.appendChild(layout);
+    layout.append(leftControls, domainButton, rightControls);
+    contentHost.append(dragRegion, layout);
 
     const splitLayer = document.createElementNS(HTML_NS, "div");
     splitLayer.id = SPLIT_LAYER_ID;
@@ -148,20 +492,20 @@
         return;
       }
 
+      // Virtualized feeds can briefly expose no paintable background while
+      // scrolling. Keep the last valid sample instead of flashing to Zen's
+      // fallback color; a real top-level navigation clears it separately.
       if (
-        typeof color === "string" &&
-        color &&
-        window.CSS?.supports?.("color", color)
+        typeof color !== "string" ||
+        !color ||
+        !window.CSS?.supports?.("color", color)
       ) {
-        container.style.setProperty("--floating-domain-page-color", color);
-        container.setAttribute("floating-domain-page-tone", tone);
-        pageAppearanceByBrowser.set(browser, { color, tone });
-      } else {
-        container.style.removeProperty("--floating-domain-page-color");
-        container.removeAttribute("floating-domain-page-tone");
-        pageAppearanceByBrowser.delete(browser);
+        return;
       }
 
+      container.style.setProperty("--floating-domain-page-color", color);
+      container.setAttribute("floating-domain-page-tone", tone);
+      pageAppearanceByBrowser.set(browser, { color, tone });
       refreshAppearance();
     };
 
@@ -169,15 +513,33 @@
       frameManager.addMessageListener(PAGE_COLOR_MESSAGE, onPageColor);
       const pageColorFrameScript = `(() => {
         const COLOR_MESSAGE = ${JSON.stringify(PAGE_COLOR_MESSAGE)};
+        const REQUEST_MESSAGE = ${JSON.stringify(PAGE_COLOR_REQUEST_MESSAGE)};
         const DESTROY_MESSAGE = ${JSON.stringify(PAGE_COLOR_DESTROY_MESSAGE)};
         let observer = null;
         let timer = 0;
+        let settleTimers = [];
+        let lastResult = "";
 
-        const isTransparent = value =>
-          !value ||
-          value === "transparent" ||
-          /^rgba\\([^,]+,[^,]+,[^,]+,\\s*0(?:\\.0+)?\\s*\\)$/i.test(value) ||
-          /\\/\\s*0(?:\\.0+)?\\s*\\)$/i.test(value);
+        const alphaForColor = value => {
+          if (!value || value === "transparent") {
+            return 0;
+          }
+
+          const modernAlpha = value.match(
+            /\\/\\s*([\\d.]+)\\s*(%)?\\s*\\)$/i
+          );
+          if (modernAlpha) {
+            const alpha = Number(modernAlpha[1]);
+            return modernAlpha[2] ? alpha / 100 : alpha;
+          }
+
+          const legacyAlpha = value.match(
+            /^rgba\\([^,]+,[^,]+,[^,]+,\\s*([\\d.]+)\\s*\\)$/i
+          );
+          return legacyAlpha ? Number(legacyAlpha[1]) : 1;
+        };
+
+        const isOpaque = value => alphaForColor(value) >= 0.999;
 
         const colorAtPoint = (doc, x, y) => {
           const width = Math.max(1, content.innerWidth);
@@ -188,7 +550,10 @@
 
           for (const element of elements) {
             const color = content.getComputedStyle(element).backgroundColor;
-            if (!isTransparent(color)) {
+            // Sticky headers often use translucent black. Painting that same
+            // RGBA value in browser chrome exposes Zen's theme underneath,
+            // so walk through it and sample the first opaque page layer.
+            if (isOpaque(color)) {
               return color;
             }
           }
@@ -198,16 +563,10 @@
 
         const chooseVisibleColor = doc => {
           const width = Math.max(1, content.innerWidth);
-          const yNear = Math.min(8, Math.max(0, content.innerHeight - 1));
-          const yLower = Math.min(40, Math.max(0, content.innerHeight - 1));
-          const points = [
-            [8, yNear],
-            [width - 9, yNear],
-            [width * 0.25, yNear],
-            [width * 0.75, yNear],
-            [8, yLower],
-            [width - 9, yLower],
-          ];
+          const height = Math.max(1, content.innerHeight);
+          const xs = [6, width * 0.2, width * 0.5, width * 0.8, width - 7];
+          const ys = [6, 20, 44].map(y => Math.min(y, height - 1));
+          const points = ys.flatMap(y => xs.map(x => [x, y]));
           const colors = points
             .map(([x, y]) => colorAtPoint(doc, x, y))
             .filter(Boolean);
@@ -249,13 +608,11 @@
         };
 
         const readPageColor = () => {
-          timer = 0;
           const doc = content.document;
           const root = doc?.documentElement;
           const body = doc?.body;
 
           if (!root || root.localName !== "html") {
-            sendAsyncMessage(COLOR_MESSAGE, { color: "" });
             return;
           }
 
@@ -265,24 +622,46 @@
             : "";
           const visibleColor = chooseVisibleColor(doc);
           const color = visibleColor ||
-            (!isTransparent(rootColor)
+            (isOpaque(rootColor)
               ? rootColor
-              : !isTransparent(bodyColor)
+              : isOpaque(bodyColor)
                 ? bodyColor
                 : "");
 
-          sendAsyncMessage(COLOR_MESSAGE, {
-            color,
-            tone: toneForColor(color),
-          });
+          if (!color) {
+            return;
+          }
+
+          const tone = toneForColor(color);
+          const result = color + "|" + tone;
+
+          if (result !== lastResult) {
+            lastResult = result;
+            sendAsyncMessage(COLOR_MESSAGE, { color, tone });
+          }
         };
 
-        const scheduleRead = () => {
+        const scheduleRead = (delay = 60) => {
           if (timer) {
-            content.clearTimeout(timer);
+            return;
           }
-          timer = content.setTimeout(readPageColor, 40);
+
+          timer = content.setTimeout(() => {
+            timer = 0;
+            readPageColor();
+          }, delay);
         };
+
+        const scheduleSettledReads = () => {
+          for (const pending of settleTimers) {
+            content.clearTimeout(pending);
+          }
+
+          settleTimers = [0, 80, 220, 500, 1000, 1800].map(delay =>
+            content.setTimeout(readPageColor, delay)
+          );
+        };
+        const scheduleReadFromEvent = () => scheduleRead();
 
         const observeDocument = () => {
           observer?.disconnect();
@@ -295,7 +674,7 @@
             return;
           }
 
-          observer = new content.MutationObserver(scheduleRead);
+          observer = new content.MutationObserver(scheduleReadFromEvent);
           observer.observe(root, {
             attributes: true,
             attributeFilter: ["class", "style"],
@@ -306,27 +685,34 @@
               attributeFilter: ["class", "style"],
             });
           }
-          scheduleRead();
+          scheduleSettledReads();
         };
 
         const destroy = () => {
           removeEventListener("DOMContentLoaded", observeDocument, true);
           removeEventListener("pageshow", observeDocument, true);
-          removeEventListener("load", scheduleRead, true);
-          removeEventListener("resize", scheduleRead, true);
-          removeEventListener("scroll", scheduleRead, true);
+          removeEventListener("load", scheduleSettledReads, true);
+          removeEventListener("resize", scheduleReadFromEvent, true);
+          removeEventListener("hashchange", scheduleSettledReads, true);
+          removeEventListener("popstate", scheduleSettledReads, true);
           observer?.disconnect();
           if (timer) {
             content.clearTimeout(timer);
           }
+          for (const pending of settleTimers) {
+            content.clearTimeout(pending);
+          }
+          removeMessageListener(REQUEST_MESSAGE, scheduleSettledReads);
           removeMessageListener(DESTROY_MESSAGE, destroy);
         };
 
         addEventListener("DOMContentLoaded", observeDocument, true);
         addEventListener("pageshow", observeDocument, true);
-        addEventListener("load", scheduleRead, true);
-        addEventListener("resize", scheduleRead, true);
-        addEventListener("scroll", scheduleRead, true);
+        addEventListener("load", scheduleSettledReads, true);
+        addEventListener("resize", scheduleReadFromEvent, true);
+        addEventListener("hashchange", scheduleSettledReads, true);
+        addEventListener("popstate", scheduleSettledReads, true);
+        addMessageListener(REQUEST_MESSAGE, scheduleSettledReads);
         addMessageListener(DESTROY_MESSAGE, destroy);
         observeDocument();
       })();`;
@@ -336,6 +722,14 @@
         encodeURIComponent(pageColorFrameScript);
       frameManager.loadFrameScript(pageColorFrameScriptURL, true);
     }
+
+    const requestPageColor = browser => {
+      try {
+        browser?.messageManager?.sendAsyncMessage(PAGE_COLOR_REQUEST_MESSAGE);
+      } catch {
+        // The content process may be swapping during navigation.
+      }
+    };
 
     const updateBrowserLayoutMode = () => {
       const root = document.documentElement;
@@ -356,6 +750,10 @@
     const update = uri => {
       const currentURI = uri || gBrowser.selectedBrowser?.currentURI;
       label.textContent = labelForURI(currentURI);
+      renderLoadingIndicator(
+        domainLoading,
+        loadingTracker.get(gBrowser.selectedBrowser)
+      );
     };
 
     let scheduleSplitSync = () => {};
@@ -423,6 +821,71 @@
     const getSplitContainer = tab =>
       tab?.linkedBrowser?.closest?.(".browserSidebarContainer") ?? null;
 
+    const getVisiblePanelBounds = container => {
+      const bounds = container.getBoundingClientRect();
+      const ancestors = [];
+      let left = bounds.left;
+      let right = bounds.right;
+      let top = bounds.top;
+      let bottom = bounds.bottom;
+
+      // Zen can clip a full-height browser container inside a smaller split
+      // cell. Intersect every rendered ancestor so centering uses the panel
+      // the user actually sees, not the oversized internal browser box.
+      for (
+        let ancestor = container.parentElement;
+        ancestor && ancestor !== contentHost;
+        ancestor = ancestor.parentElement
+      ) {
+        const rect = ancestor.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) {
+          continue;
+        }
+
+        ancestors.push(ancestor);
+        left = Math.max(left, rect.left);
+        right = Math.min(right, rect.right);
+        top = Math.max(top, rect.top);
+        bottom = Math.min(bottom, rect.bottom);
+      }
+
+      return { left, right, top, bottom, ancestors };
+    };
+
+    const getUsableSplitBounds = container => {
+      const panelBounds = getVisiblePanelBounds(container);
+      const hostRect = contentHost.getBoundingClientRect();
+      let left = Math.max(panelBounds.left, hostRect.left);
+      let right = Math.min(panelBounds.right, hostRect.right);
+      const top = Math.max(panelBounds.top, hostRect.top);
+      const bottom = Math.min(panelBounds.bottom, hostRect.bottom);
+      const sidebarRect = sidebar.getBoundingClientRect();
+
+      if (document.documentElement.getAttribute("zen-right-side") === "true") {
+        if (
+          sidebarRect.left < right &&
+          sidebarRect.right >= panelBounds.right
+        ) {
+          right = Math.max(left, Math.min(right, sidebarRect.left));
+        }
+      } else if (
+        sidebarRect.right > left &&
+        sidebarRect.left <= panelBounds.left
+      ) {
+        left = Math.min(right, Math.max(left, sidebarRect.right));
+      }
+
+      return {
+        ...panelBounds,
+        left,
+        right,
+        top,
+        bottom,
+        width: Math.max(0, right - left),
+        height: Math.max(0, bottom - top),
+      };
+    };
+
     const getActiveSplitTabs = () => {
       const splitter = window.gZenViewSplitter;
       const group = splitter?._data?.[splitter.currentView];
@@ -448,6 +911,50 @@
           container.getBoundingClientRect().width > 0
         );
       });
+    };
+
+    const getPanelBoundsForTab = tab => {
+      const container = getSplitContainer(tab);
+      if (!container) {
+        return null;
+      }
+
+      const bounds = getUsableSplitBounds(container);
+      const tabs = getActiveSplitTabs();
+      if (tabs.length < 2) {
+        return bounds;
+      }
+
+      const hostRect = contentHost.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
+      const peerRects = tabs
+        .filter(peer => peer !== tab)
+        .map(peer => getSplitContainer(peer)?.getBoundingClientRect())
+        .filter(Boolean);
+      const nextLeft = peerRects
+        .map(peer => peer.left)
+        .filter(left => left > rect.left + 2)
+        .sort((a, b) => a - b)[0];
+      const nextTop = peerRects
+        .map(peer => peer.top)
+        .filter(top => top > rect.top + 2)
+        .sort((a, b) => a - b)[0];
+      const right = Math.min(
+        bounds.right,
+        nextLeft ?? hostRect.right
+      );
+      const bottom = Math.min(
+        bounds.bottom,
+        nextTop ?? hostRect.bottom
+      );
+
+      return {
+        ...bounds,
+        right,
+        bottom,
+        width: Math.max(0, right - bounds.left),
+        height: Math.max(0, bottom - bounds.top),
+      };
     };
 
     const applyTone = (element, appearance) => {
@@ -481,14 +988,15 @@
         edgeBrowser = rightmostTab?.linkedBrowser ?? edgeBrowser;
       }
 
-      const rootTone =
-        pageAppearanceByBrowser.get(edgeBrowser)?.tone === "light"
-          ? "light"
-          : "dark";
-      document.documentElement.setAttribute(
-        "floating-domain-page-tone",
-        rootTone
-      );
+      const edgeAppearance = pageAppearanceByBrowser.get(edgeBrowser);
+      if (edgeAppearance) {
+        document.documentElement.setAttribute(
+          "floating-domain-page-tone",
+          edgeAppearance.tone === "light" ? "light" : "dark"
+        );
+      } else {
+        document.documentElement.removeAttribute("floating-domain-page-tone");
+      }
     };
 
     refreshAppearance = updateMaterialAppearance;
@@ -498,6 +1006,118 @@
       if (tab && !tab.closing && gBrowser.selectedTab !== tab) {
         gBrowser.selectedTab = tab;
       }
+    };
+
+    let nativeFloatingTab = null;
+    let nativeFocusFrame = 0;
+
+    const focusNativeUrlbar = () => {
+      if (nativeFocusFrame) {
+        window.cancelAnimationFrame(nativeFocusFrame);
+      }
+
+      nativeFocusFrame = window.requestAnimationFrame(() => {
+        nativeFocusFrame = 0;
+
+        if (
+          !urlbar.hasAttribute("zen-floating-urlbar") ||
+          !urlbar.hasAttribute("open")
+        ) {
+          return;
+        }
+
+        try {
+          gURLBar.focus();
+
+          const input = gURLBar.inputField;
+          if (input && document.activeElement !== input) {
+            input.focus();
+          }
+
+          if (typeof gURLBar.select === "function") {
+            gURLBar.select();
+          } else {
+            input?.select();
+          }
+        } catch {
+          // Zen may close or replace the URL bar while the frame is pending.
+        }
+      });
+    };
+
+    const clearNativeFloatingState = () => {
+      nativeFloatingTab = null;
+      document.documentElement.removeAttribute(
+        "floating-domain-bar-native-open"
+      );
+      document.documentElement.style.removeProperty(
+        "--floating-domain-native-left"
+      );
+      document.documentElement.style.removeProperty(
+        "--floating-domain-native-top"
+      );
+      document.documentElement.style.removeProperty(
+        "--floating-domain-native-width"
+      );
+    };
+
+    const updateNativeFloatingGeometry = tab => {
+      const container = getSplitContainer(tab);
+      if (!container || tab?.closing) {
+        clearNativeFloatingState();
+        return false;
+      }
+
+      const bounds = getPanelBoundsForTab(tab);
+      if (bounds.width < 128 || bounds.height < 64) {
+        clearNativeFloatingState();
+        return false;
+      }
+
+      const sidePadding = bounds.width < 360 ? 8 : 12;
+      const width = Math.max(
+        120,
+        Math.min(750, bounds.width / 1.5, bounds.width - sidePadding * 2)
+      );
+      const popupHeight = Math.min(333, Math.max(62, bounds.height - 24));
+      const top = bounds.top + Math.max(12, (bounds.height - popupHeight) / 2);
+
+      nativeFloatingTab = tab;
+      document.documentElement.setAttribute(
+        "floating-domain-bar-native-open",
+        "true"
+      );
+      document.documentElement.style.setProperty(
+        "--floating-domain-native-left",
+        `${Math.round(bounds.left + bounds.width / 2)}px`
+      );
+      document.documentElement.style.setProperty(
+        "--floating-domain-native-top",
+        `${Math.round(top)}px`
+      );
+      document.documentElement.style.setProperty(
+        "--floating-domain-native-width",
+        `${Math.round(width)}px`
+      );
+      return true;
+    };
+
+    const openZenFloatingUrlbar = tab => {
+      if (!tab || tab.closing) {
+        return;
+      }
+
+      activateTab(tab);
+      if (!updateNativeFloatingGeometry(tab)) {
+        clearNativeFloatingState();
+        return;
+      }
+
+      // Zen only floats the native editor when focus did not originate from
+      // its own mousedown handler. Our idle domain bar acts exactly like Ctrl+L.
+      gURLBar.focusedViaMousedown = false;
+      document.getElementById("Browser:OpenLocation")?.doCommand();
+      focusNativeUrlbar();
     };
 
     const makeSplitButton = (actionName, title, action) => {
@@ -523,44 +1143,6 @@
       return button;
     };
 
-    const navigateSplitTab = (tab, rawValue) => {
-      const value = rawValue.trim();
-      if (!value || !tab?.linkedBrowser) {
-        return;
-      }
-
-      activateTab(tab);
-
-      try {
-        const flags =
-          Ci.nsIURIFixup.FIXUP_FLAG_FIX_SCHEME_TYPOS |
-          Ci.nsIURIFixup.FIXUP_FLAG_ALLOW_KEYWORD_LOOKUP;
-        const info = Services.uriFixup.getFixupURIInfo(value, flags);
-        const options = {
-          triggeringPrincipal:
-            Services.scriptSecurityManager.getSystemPrincipal(),
-        };
-
-        if (info.postData) {
-          options.postData = info.postData;
-        }
-
-        gURLBar._loadURL(
-          info.preferredURI.spec,
-          null,
-          "current",
-          {
-            allowInheritPrincipal: false,
-            postData: options.postData ?? null,
-          },
-          null,
-          tab.linkedBrowser
-        );
-      } catch (error) {
-        console.error("Floating Domain Bar: adres açılamadı", error);
-      }
-    };
-
     const updateSplitBar = tab => {
       const entry = splitBars.get(tab);
       if (!entry) {
@@ -568,16 +1150,12 @@
       }
 
       const browser = tab.linkedBrowser;
-      const editing = entry.input.getAttribute("data-editing") === "true";
-
-      if (!editing) {
-        entry.input.value = labelForURI(browser.currentURI);
-      }
-
+      entry.input.value = labelForURI(browser.currentURI);
       entry.back.disabled = !browser.canGoBack;
       entry.forward.disabled = !browser.canGoForward;
       entry.bar.toggleAttribute("data-selected", gBrowser.selectedTab === tab);
       applyTone(entry.bar, pageAppearanceByBrowser.get(browser));
+      renderLoadingIndicator(entry.loading, loadingTracker.get(browser));
     };
 
     const createSplitBar = tab => {
@@ -611,37 +1189,41 @@
       const input = document.createElementNS(HTML_NS, "input");
       input.className = "floating-domain-split-input";
       input.type = "text";
+      input.readOnly = true;
       input.autocomplete = "off";
       input.spellcheck = false;
       input.setAttribute("aria-label", "Bu panelde ara veya adres gir");
-
-      input.addEventListener("focus", () => {
-        activateTab(tab);
-        input.setAttribute("data-editing", "true");
-        input.value = editableValueForURI(tab.linkedBrowser.currentURI);
-        window.requestAnimationFrame(() => input.select());
-      });
-      input.addEventListener("blur", () => {
-        input.removeAttribute("data-editing");
-        updateSplitBar(tab);
-      });
-      input.addEventListener("keydown", event => {
-        if (event.key === "Enter") {
+      input.addEventListener("pointerdown", event => {
+        if (event.button === 0) {
           event.preventDefault();
           event.stopPropagation();
-          navigateSplitTab(tab, input.value);
-          input.blur();
-        } else if (event.key === "Escape") {
+        }
+      });
+      input.addEventListener("mousedown", event => {
+        if (event.button === 0) {
           event.preventDefault();
-          input.blur();
+          event.stopPropagation();
+        }
+      });
+      input.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        openZenFloatingUrlbar(tab);
+      });
+      input.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          event.stopPropagation();
+          openZenFloatingUrlbar(tab);
         }
       });
 
-      shell.appendChild(input);
+      const loading = createLoadingIndicator();
+      shell.append(input, loading.track);
       bar.append(controls, shell);
       splitLayer.appendChild(bar);
 
-      const entry = { bar, controls, input, back, forward, reload };
+      const entry = { bar, controls, input, back, forward, reload, loading };
       splitBars.set(tab, entry);
       updateSplitBar(tab);
       return entry;
@@ -676,33 +1258,17 @@
         }
 
         nextObserved.add(container);
-        const panelRect = container.getBoundingClientRect();
-        let visibleLeft = panelRect.left;
-        let visibleRight = panelRect.right;
-
-        const sidebarRect = sidebar.getBoundingClientRect();
-
-        if (document.documentElement.getAttribute("zen-right-side") === "true") {
-          if (
-            sidebarRect.left < visibleRight &&
-            sidebarRect.right >= panelRect.right
-          ) {
-            visibleRight = Math.max(
-              visibleLeft,
-              Math.min(visibleRight, sidebarRect.left)
-            );
-          }
-        } else if (
-          sidebarRect.right > visibleLeft &&
-          sidebarRect.left <= panelRect.left
-        ) {
-          visibleLeft = Math.min(
-            visibleRight,
-            Math.max(visibleLeft, sidebarRect.right)
-          );
+        const panelBounds = getPanelBoundsForTab(tab);
+        if (!panelBounds) {
+          continue;
         }
-
-        const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+        for (const ancestor of panelBounds.ancestors) {
+          nextObserved.add(ancestor);
+        }
+        const visibleLeft = panelBounds.left;
+        const visibleTop = panelBounds.top;
+        const visibleWidth = panelBounds.width;
+        const visibleHeight = panelBounds.height;
         const entry = splitBars.get(tab) || createSplitBar(tab);
         const sidePadding = visibleWidth < 360 ? 8 : 12;
         const rowWidth = Math.max(
@@ -711,14 +1277,18 @@
         );
         const left =
           visibleLeft - hostRect.left + (visibleWidth - rowWidth) / 2;
-        const top = panelRect.top - hostRect.top + 10;
+        const top = visibleTop - hostRect.top + 10;
 
         entry.bar.style.left = `${Math.round(left)}px`;
         entry.bar.style.top = `${Math.round(top)}px`;
         entry.bar.style.width = `${Math.round(rowWidth)}px`;
-        entry.bar.hidden = visibleWidth < 128 || panelRect.height < 64;
+        entry.bar.hidden = visibleWidth < 128 || visibleHeight < 64;
         entry.bar.toggleAttribute("data-narrow", visibleWidth < 420);
         updateSplitBar(tab);
+      }
+
+      if (nativeFloatingTab) {
+        updateNativeFloatingGeometry(nativeFloatingTab);
       }
 
       refreshAppearance();
@@ -783,6 +1353,19 @@
       window.addEventListener(eventName, onSplitEvent);
     }
 
+    const loadingTracker = createLoadingTracker({
+      onChange(browser) {
+        if (browser === gBrowser.selectedBrowser) {
+          renderLoadingIndicator(domainLoading, loadingTracker.get(browser));
+        }
+        const tab = gBrowser.getTabForBrowser(browser);
+        const entry = tab && splitBars.get(tab);
+        if (entry) {
+          renderLoadingIndicator(entry.loading, loadingTracker.get(browser));
+        }
+      },
+    });
+
     const progressListener = {
       onLocationChange(browser, _webProgress, _request, locationURI) {
         if (!_webProgress?.isTopLevel) {
@@ -801,26 +1384,55 @@
           update(locationURI);
         }
 
+        requestPageColor(browser);
+
         const tab = gBrowser.getTabForBrowser(browser);
         if (tab && splitBars.has(tab)) {
           updateSplitBar(tab);
         }
       },
 
-      onStateChange(browser) {
+      onStateChange(browser, webProgress, request, stateFlags, status) {
+        loadingTracker.onStateChange(
+          browser, webProgress, request, stateFlags, status
+        );
         const tab = gBrowser.getTabForBrowser(browser);
         if (tab && splitBars.has(tab)) {
           updateSplitBar(tab);
         }
+      },
+
+      onProgressChange(
+        browser, webProgress, _request, _currentSelf,
+        _maximumSelf, currentTotal, maximumTotal
+      ) {
+        loadingTracker.onProgressChange(
+          browser, webProgress, currentTotal, maximumTotal
+        );
       },
     };
 
     const onTabSelect = () => {
+      loadingTracker.seed(gBrowser.selectedBrowser);
       update();
       refreshAppearance();
+      requestPageColor(gBrowser.selectedBrowser);
       scheduleSplitSync();
+
+      if (
+        urlbar.hasAttribute("zen-floating-urlbar") &&
+        urlbar.hasAttribute("open")
+      ) {
+        updateNativeFloatingGeometry(gBrowser.selectedTab);
+        focusNativeUrlbar();
+      }
     };
-    const onTabChange = () => scheduleSplitSync(true);
+    const onTabChange = event => {
+      if (event.type === "TabClose") {
+        loadingTracker.forget(event.target.linkedBrowser);
+      }
+      scheduleSplitSync(true);
+    };
     const onPageShow = () => update();
     const onWindowResize = () => {
       scheduleSidebarUpdate();
@@ -828,9 +1440,6 @@
     };
     const onWindowKeyDown = event => {
       if (
-        !document.documentElement.hasAttribute(
-          "floating-domain-bar-split-active"
-        ) ||
         event.altKey ||
         (!event.ctrlKey && !event.metaKey) ||
         event.key.toLowerCase() !== "l"
@@ -838,29 +1447,40 @@
         return;
       }
 
-      const entry = splitBars.get(gBrowser.selectedTab);
-      if (entry) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        entry.input.focus();
+      if (!updateNativeFloatingGeometry(gBrowser.selectedTab)) {
+        clearNativeFloatingState();
       }
     };
-    const nativeUrlInput = document.getElementById("urlbar-input");
-    const redirectNativeUrlbarFocus = () => {
+    const onDomainButtonClick = event => {
       if (
-        !document.documentElement.hasAttribute(
-          "floating-domain-bar-split-active"
-        )
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
       ) {
         return;
       }
 
-      const entry = splitBars.get(gBrowser.selectedTab);
-      if (entry) {
-        window.requestAnimationFrame(() => entry.input.focus());
-      }
+      event.preventDefault();
+      event.stopPropagation();
+      openZenFloatingUrlbar(gBrowser.selectedTab);
     };
+    const nativeUrlbarStateObserver = new MutationObserver(() => {
+      if (urlbar.hasAttribute("zen-floating-urlbar")) {
+        updateNativeFloatingGeometry(gBrowser.selectedTab);
+        if (urlbar.hasAttribute("open")) {
+          focusNativeUrlbar();
+        }
+      } else if (
+        !urlbar.hasAttribute("breakout-extend")
+      ) {
+        clearNativeFloatingState();
+      }
+    });
+    nativeUrlbarStateObserver.observe(urlbar, {
+      attributes: true,
+      attributeFilter: ["zen-floating-urlbar", "breakout-extend", "open"],
+    });
 
     gBrowser.addTabsProgressListener(progressListener);
     gBrowser.tabContainer.addEventListener("TabSelect", onTabSelect);
@@ -869,10 +1489,13 @@
     window.addEventListener("pageshow", onPageShow);
     window.addEventListener("resize", onWindowResize);
     window.addEventListener("keydown", onWindowKeyDown, true);
-    window.addEventListener("keypress", onWindowKeyDown, true);
-    nativeUrlInput?.addEventListener("focus", redirectNativeUrlbarFocus);
+    domainButton.addEventListener("click", onDomainButtonClick);
+    for (const tab of gBrowser.tabs) {
+      loadingTracker.seed(tab.linkedBrowser);
+    }
 
     const cleanup = () => {
+      loadingTracker.destroy();
       try {
         gBrowser.removeTabsProgressListener(progressListener);
       } catch {
@@ -885,8 +1508,9 @@
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("resize", onWindowResize);
       window.removeEventListener("keydown", onWindowKeyDown, true);
-      window.removeEventListener("keypress", onWindowKeyDown, true);
-      nativeUrlInput?.removeEventListener("focus", redirectNativeUrlbarFocus);
+      domainButton.removeEventListener("click", onDomainButtonClick);
+      nativeUrlbarStateObserver.disconnect();
+      clearNativeFloatingState();
       sidebarObserver.disconnect();
       sidebarStateObserver.disconnect();
       splitResizeObserver.disconnect();
@@ -924,6 +1548,10 @@
         window.cancelAnimationFrame(splitFrame);
       }
 
+      if (nativeFocusFrame) {
+        window.cancelAnimationFrame(nativeFocusFrame);
+      }
+
       document.documentElement.style.removeProperty(
         "--floating-domain-bar-sidebar-width"
       );
@@ -948,8 +1576,12 @@
         }
       }
 
+      stopWindowDrag();
+      dragRegion.removeEventListener("pointerdown", onWindowDragStart);
+      dragRegion.removeEventListener("dblclick", onWindowDragDoubleClick);
       splitLayer.remove();
       layout.remove();
+      dragRegion.remove();
       label.remove();
       delete window[STATE_KEY];
     };
@@ -959,6 +1591,12 @@
     updateSidebarWidth();
     update();
     scheduleSplitSync(true);
+    if (urlbar.hasAttribute("zen-floating-urlbar")) {
+      updateNativeFloatingGeometry(gBrowser.selectedTab);
+      if (urlbar.hasAttribute("open")) {
+        focusNativeUrlbar();
+      }
+    }
     return true;
   }
 
