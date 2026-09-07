@@ -1,0 +1,23 @@
+name: Validate mod
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: node --check floating-domain-bar.uc.js
+      - name: Check Sine package and behavior
+        run: node --test tests/*.test.cjs
+      - name: Check whitespace
+        run: git diff --check

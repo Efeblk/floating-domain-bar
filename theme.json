@@ -2,10 +2,10 @@
   "id": "floating-domain-bar",
   "name": "Floating Domain Bar",
   "description": "Adds a real top browser row with visible-edge color sampling and adaptive light/dark materials, without modifying website layouts.",
-  "author": "efeba",
-  "version": "0.20.0",
+  "author": "Efeblk",
+  "version": "0.20.1",
   "createdAt": "2026-08-29",
-  "updatedAt": "2026-09-02",
+  "updatedAt": "2026-09-07",
   "style": {
     "chrome": "userChrome.css"
   },
@@ -25,5 +25,7 @@
   ],
   "fork": [
     "zen"
-  ]
+  ],
+  "homepage": "https://github.com/Efeblk/floating-domain-bar",
+  "readme": "README.md"
 }

@@ -1,130 +1,85 @@
-> bu proje tamamen ai ile yazılmamıştır, bununla ilgili bir sorununuz varsa umurumda değil
-
 # Floating Domain Bar
 
-Zen Browser için minimal, responsive bir adres çubuğu modu. Tarayıcının üstünde
-gerçek bir alan ayırır; boşta tam URL yerine yalnızca sitenin ana alan adını
-gösterir.
+[English](README.md) · [Türkçe](README.tr.md)
+
+A minimal address bar mod for **Zen Browser**, installed with **Sine**.
+It reserves a real 52-pixel browser row above the page and shows the site's
+base domain while idle. Click it, or press Ctrl+L (Cmd+L on macOS), to open
+Zen's native URL editor with the full address selected.
 
 ```text
-https://www.youtube.com/watch?v=abc  ->  youtube.com
-https://mail.google.com/...          ->  google.com
+https://www.youtube.com/watch?v=abc  →  youtube.com
+https://mail.google.com/            →  google.com
 ```
 
-Adres alanına tıklandığında veya `Ctrl+L` kullanıldığında gerçek URL normal
-şekilde görünür, otomatik odaklanır ve düzenlenebilir. Mevcut adres seçili
-geldiği için ikinci kez tıklamadan doğrudan yazılabilir. Mod, adresin gerçek
-değerini değiştirmez.
+## Install with Sine
 
-## Özellikler
-
-- Adres çubuğunu web alanının merkezinde tutar.
-- Site boşta görüntülenirken yalnızca ana domaini gösterir.
-- Safari benzeri ince mavi yükleme çizgisi kapsülün alt kenarında ilerler;
-  Split View'da her panel yalnızca kendi sekmesinin yüklenmesini gösterir.
-- Web sayfasına dokunmadan üstte 52 piksellik gerçek tarayıcı alanı ayırır.
-- Sayfanın üst kenarındaki görünür zemin rengini örnekleyerek boş alanları
-  sayfayla uyumlu hale getirir.
-- Açık ve koyu sayfalarda yazı, ikon, kenarlık ve cam yüzey kontrastını otomatik
-  ayarlar.
-- Geri, ileri, yenile ve Zen menü düğmelerini adres alanının yanında tutar.
-- Üst satırın boş alanları Windows'ta yerel pencere sürükleme bölgesidir;
-  domain alanı ve düğmeler tıklanabilir kalır.
-- Windows küçültme, büyütme ve kapatma düğmelerinin tıklama alanını sabitler.
-- Zen Split View'da her görünür panel için bağımsız ve responsive bir domain
-  alanı oluşturur.
-- Domain alanına tıklanınca özel bir editör yerine Zen'in kendi floating URL
-  editörü açılır; tek sekmede web alanının, Split View'da tıklanan panelin
-  görünür sınırlarını kullanır.
-- Zen'in gerçek URL bar öğesini kendi toolbar DOM'unda bırakır; üstte görünen
-  domain kapsülü yalnızca güvenli ve tıklanabilir bir tetikleyicidir.
-- `Ctrl+S` Compact Mode ve Zen'in üç tarayıcı yerleşimini destekler.
-
-## Desteklenen Zen yerleşimleri
-
-- **Only Sidebar**
-- **Sidebar and Top Toolbar**
-- **Collapsed Sidebar**
-
-Sidebar ve pencere genişliği canlı ölçülür. Adres alanı dar pencerelerde Windows
-düğmeleriyle veya Zen menüsüyle üst üste binmeden küçülür.
-
-## Gereksinimler
-
-- [Zen Browser](https://zen-browser.app/)
-- [Sine](https://github.com/CosmoCreeper/Sine)
-- Sine ayarlarında mağaza dışındaki JavaScript modlarına izin verilmesi
-
-## Sine ile kurulum
-
-1. Zen'de `Ayarlar > Sine Mods` bölümünü açın.
-2. Mağaza dışındaki JavaScript modlarına izin verin.
-3. Depo/URL ile kurulum alanına aşağıdaki bağlantıyı yapıştırın:
+1. Install [Zen Browser](https://zen-browser.app/) and
+   [Sine](https://github.com/CosmoCreeper/Sine#installation).
+2. Open **Settings → Sine Mods**.
+3. For repository installation, enable Sine's option allowing JavaScript mods
+   from outside the marketplace. This mod requires both CSS and JavaScript.
+4. Paste this into the custom repository installation field:
 
    ```text
    https://github.com/Efeblk/floating-domain-bar
    ```
 
-4. Modu kurun ve Zen'i yeniden başlatın.
+5. Install the mod and restart Zen completely.
 
-Bir güncellemeden sonra görünüm değişmezse modu Sine üzerinden yeniden yükleyip
-Zen'i tamamen kapatarak tekrar açın.
+The repository is the installation source. A public Sine marketplace listing
+is a separate submission and review step; see [the submission guide](docs/SINE_SUBMISSION.md).
+This is a Sine package for Zen, not a Firefox extension or a CSS-only Zen theme.
 
-## Nasıl çalışır?
+## Features
 
-Mod yalnızca Zen'in tarayıcı arayüzünü değiştirir. Web sayfasının DOM'u,
-`body` konumu, padding'i, transform'u veya CSS'i değiştirilmez. Sayfa zemini
-salt okunur olarak örneklenir ve yalnızca ayrılan tarayıcı satırında kullanılır.
+- Base-domain labels without changing the actual URL.
+- Native URL editing and browser navigation controls.
+- Independent address bars and loading indicators in Split View.
+- Page-edge color sampling with adaptive light/dark contrast.
+- Responsive sizing for Zen's three layouts and Compact Mode.
+- Reduced-motion support for loading animations.
+- English interface labels, with Turkish labels for Turkish browser locales.
 
-Split View açıldığında her panel kendi sitesinin zemin rengini ve adresini ayrı
-izler. Bir panelin domain alanına tıklamak o paneli etkinleştirir ve Zen'in
-yerleşik floating URL editörünü o panelin görünür sınırları içinde açar; yazılan
-adres veya arama yalnızca o panelde açılır. Konum split oranı ya da pencere
-boyutu değiştiğinde yeniden hesaplanır.
+The mod reads page background colors and changes browser chrome only. It does
+not change website layout, send network requests, or save browsing history.
+Sine handles downloading and updating the mod separately.
 
-Yükleme çizgisi Zen'in üst düzey sayfa yükleme olaylarını takip eder. Aktarım
-boyutu biliniyorsa gerçek ilerlemeyi kullanır; bilinmiyorsa bitişe varmayan
-yumuşak bir tahmin gösterir. Sayfa başarıyla yüklenince çizgi tamamlanıp söner;
-iptal veya hata halinde tamamlanmış gibi görünmeden kaybolur. Web sayfasına
-herhangi bir yükleme katmanı eklenmez.
+## Compatibility
 
-## Dosyalar
+Supports Zen's **Only Sidebar**, **Sidebar and Top Toolbar**, and
+**Collapsed Sidebar** layouts. It depends on Zen's internal browser UI.
 
-- `userChrome.css` — üst satırın, adres alanının ve kontrollerin görünümü
-- `floating-domain-bar.uc.js` — domain etiketi, renk örnekleme ve Split View
-  davranışı
-- `theme.json` — Sine paket tanımı ve sürüm bilgisi
+Previously tested on Windows with Zen **1.21.16b / Gecko 154.0.1**.
+macOS and Linux have not been visually verified. The latest changes have
+passed automated tests, but still need live Zen validation.
 
-## Geliştirici testleri
+Other mods that reposition the address bar or navigation controls may conflict.
+If the UI does not update, reinstall the mod through Sine and restart Zen.
+To remove it, disable or uninstall it in Sine Mods and restart Zen.
 
-Node.js ile ek bağımlılık kurmadan çalıştırın:
+## Development
+
+No build step or npm dependencies are required. Run with Node.js 22 or newer:
 
 ```sh
 node --check floating-domain-bar.uc.js
-node --test tests/loading-progress.test.cjs
+node --test tests/*.test.cjs
 ```
 
-Testler yükleme durumlarını ve gerçek modun olay bağlantılarını sahte tarayıcı
-nesneleriyle kontrol eder; açık Zen penceresine müdahale etmez. Görsel doğrulama
-için Zen'de tek sekme/split, açık/koyu sayfa ve pencere boyutları ayrıca denenmelidir.
+The tests execute the real script and its page-color sampler using mock browser
+objects. Package checks verify the manifest and files needed by Sine. GitHub
+Actions runs these checks on pushes and pull requests.
 
-## Uyumluluk
+For visual validation, test single tabs and Split View, light and dark pages,
+all three Zen layouts, narrow windows, Compact Mode, native URL editing,
+and disabling/re-enabling the mod after a restart.
 
-Windows üzerinde Zen `1.21.16b` / Gecko `154.0.1` ile test edilmiştir. Zen'in
-dahili arayüz kimlikleri sürümler arasında değişebildiği için gelecekteki büyük
-Zen güncellemeleri küçük uyumluluk düzeltmeleri gerektirebilir.
+## Files
 
-Linux ve macOS henüz test edilmemiştir.
+- `theme.json`: Sine metadata, stylesheet, and script registration.
+- `userChrome.css`: browser row and controls.
+- `floating-domain-bar.uc.js`: domain labels, colors, loading, and Split View.
+- `tests/`: dependency-free package and regression checks.
 
-## Gizlilik
-
-Mod ağ isteği göndermez, geçmiş veya adres verisi kaydetmez ve harici bir
-sunucuya bağlanmaz. Tüm davranış tarayıcı içinde yerel olarak çalışır.
-
-## Sürüm notları
-
-Değişiklik geçmişi için [CHANGELOG.md](CHANGELOG.md) dosyasına bakın.
-
-## Lisans
-
-Bu proje [MIT Lisansı](LICENSE) ile sunulur.
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Licensed under [MIT](LICENSE).

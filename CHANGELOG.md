@@ -2,6 +2,24 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## [0.20.1] - 2026-09-07
+
+### Eklendi
+
+- Sine mağazası için homepage/readme bilgileri, İngilizce kurulum rehberi,
+  paket doğrulaması ve GitHub Actions kontrolleri
+- Türkçe tarayıcılarda Türkçe etiketler; diğer diller için İngilizce arayüz
+
+### Düzeltildi
+
+- Aynı zemin rengine sahip sayfalar arasında geçişte temizlenen renk örneği
+  artık yeniden gönderilir; açık renk istekleri önbelleğe takılmaz.
+- Kaydırma sırasında görünür sayfa kenarı yeniden örneklenir; yoğun kaydırma
+  olayları tek bir bekleyen örnekleme zamanlayıcısında birleştirilir.
+- Elle temizleme pencerenin unload dinleyicisini kaldırır ve tekrar çağrılsa
+  bile tarayıcı kontrollerinin sırasını değiştirmez.
+- Renk örnekleme ve tekrar temizleme için dört regresyon testi eklendi.
+
 ## [0.20.0] - 2026-09-02
 
 ### Eklendi

@@ -15,6 +15,12 @@
     return;
   }
 
+  // Follow the browser UI locale; use English for locales without a translation.
+  const isTurkish = /^tr(?:-|$)/i.test(
+    globalThis.Services?.locale?.appLocaleAsBCP47 || window.navigator?.language || "en"
+  );
+  const text = (english, turkish) => isTurkish ? turkish : english;
+
   function labelForURI(uri) {
     if (!uri) {
       return "";
@@ -37,19 +43,19 @@
     const spec = uri.spec ?? "";
 
     if (/^about:(?:blank|home|newtab)(?:[?#].*)?$/i.test(spec)) {
-      return "Yeni Sekme";
+      return text("New Tab", "Yeni Sekme");
     }
 
     if (/^about:preferences/i.test(spec)) {
-      return "Ayarlar";
+      return text("Settings", "Ayarlar");
     }
 
     if (scheme === "file") {
-      return "Yerel Dosya";
+      return text("Local File", "Yerel Dosya");
     }
 
     if (scheme === "moz-extension") {
-      return "Eklenti";
+      return text("Extension", "Eklenti");
     }
 
     return spec || scheme;
@@ -452,7 +458,7 @@
     const domainButton = document.createElementNS(HTML_NS, "button");
     domainButton.id = "floating-domain-bar-domain";
     domainButton.type = "button";
-    domainButton.setAttribute("aria-label", "Ara veya adres gir");
+    domainButton.setAttribute("aria-label", text("Search or enter address", "Ara veya adres gir"));
 
     const label = document.createElementNS(HTML_NS, "span");
     label.id = LABEL_ID;
@@ -468,7 +474,7 @@
 
     const splitLayer = document.createElementNS(HTML_NS, "div");
     splitLayer.id = SPLIT_LAYER_ID;
-    splitLayer.setAttribute("aria-label", "Split sekme adres çubukları");
+    splitLayer.setAttribute("aria-label", text("Split tab address bars", "Split sekme adres çubukları"));
     contentHost.appendChild(splitLayer);
 
     document.documentElement.setAttribute(
@@ -662,10 +668,24 @@
           );
         };
         const scheduleReadFromEvent = () => scheduleRead();
+        const onColorRequest = () => {
+          // Chrome may have cleared its cached appearance during navigation.
+          // An explicit request must reply even when the color is unchanged.
+          lastResult = "";
+          scheduleSettledReads();
+        };
 
-        const observeDocument = () => {
+        const observeDocument = event => {
+          if (event && event.target !== content.document) {
+            return;
+          }
           observer?.disconnect();
           observer = null;
+          lastResult = "";
+          if (timer) {
+            content.clearTimeout(timer);
+            timer = 0;
+          }
 
           const doc = content.document;
           const root = doc?.documentElement;
@@ -693,6 +713,7 @@
           removeEventListener("pageshow", observeDocument, true);
           removeEventListener("load", scheduleSettledReads, true);
           removeEventListener("resize", scheduleReadFromEvent, true);
+          removeEventListener("scroll", scheduleReadFromEvent, true);
           removeEventListener("hashchange", scheduleSettledReads, true);
           removeEventListener("popstate", scheduleSettledReads, true);
           observer?.disconnect();
@@ -702,7 +723,7 @@
           for (const pending of settleTimers) {
             content.clearTimeout(pending);
           }
-          removeMessageListener(REQUEST_MESSAGE, scheduleSettledReads);
+          removeMessageListener(REQUEST_MESSAGE, onColorRequest);
           removeMessageListener(DESTROY_MESSAGE, destroy);
         };
 
@@ -710,9 +731,10 @@
         addEventListener("pageshow", observeDocument, true);
         addEventListener("load", scheduleSettledReads, true);
         addEventListener("resize", scheduleReadFromEvent, true);
+        addEventListener("scroll", scheduleReadFromEvent, true);
         addEventListener("hashchange", scheduleSettledReads, true);
         addEventListener("popstate", scheduleSettledReads, true);
-        addMessageListener(REQUEST_MESSAGE, scheduleSettledReads);
+        addMessageListener(REQUEST_MESSAGE, onColorRequest);
         addMessageListener(DESTROY_MESSAGE, destroy);
         observeDocument();
       })();`;
@@ -1165,19 +1187,19 @@
       const controls = document.createElementNS(HTML_NS, "div");
       controls.className = "floating-domain-split-controls";
 
-      const back = makeSplitButton("back", "Geri", () => {
+      const back = makeSplitButton("back", text("Back", "Geri"), () => {
         activateTab(tab);
         if (tab.linkedBrowser.canGoBack) {
           tab.linkedBrowser.goBack();
         }
       });
-      const forward = makeSplitButton("forward", "İleri", () => {
+      const forward = makeSplitButton("forward", text("Forward", "İleri"), () => {
         activateTab(tab);
         if (tab.linkedBrowser.canGoForward) {
           tab.linkedBrowser.goForward();
         }
       });
-      const reload = makeSplitButton("reload", "Yenile", () => {
+      const reload = makeSplitButton("reload", text("Reload", "Yenile"), () => {
         activateTab(tab);
         gBrowser.reloadTab(tab);
       });
@@ -1192,7 +1214,7 @@
       input.readOnly = true;
       input.autocomplete = "off";
       input.spellcheck = false;
-      input.setAttribute("aria-label", "Bu panelde ara veya adres gir");
+      input.setAttribute("aria-label", text("Search or enter address in this panel", "Bu panelde ara veya adres gir"));
       input.addEventListener("pointerdown", event => {
         if (event.button === 0) {
           event.preventDefault();
@@ -1494,7 +1516,13 @@
       loadingTracker.seed(tab.linkedBrowser);
     }
 
+    let cleanedUp = false;
     const cleanup = () => {
+      if (cleanedUp) {
+        return;
+      }
+      cleanedUp = true;
+      window.removeEventListener("unload", cleanup);
       loadingTracker.destroy();
       try {
         gBrowser.removeTabsProgressListener(progressListener);

@@ -101,16 +101,17 @@ function descendants(root) {
   return root.children.flatMap(child => [child, ...descendants(child)]);
 }
 
-function loadHelpers() {
+function loadHelpers(locale = "en-US") {
   // Expose the real helpers instead of starting the browser-dependent IIFE.
   const entrypoint = /  waitForBrowser\(\);\s*\}\)\(\);\s*$/;
   assert.match(source, entrypoint);
   const context = {
     window: {},
+    Services: { locale: { appLocaleAsBCP47: locale } },
     document: { createElementNS: (_ns, tag) => new Element(tag) },
   };
   vm.runInNewContext(source.replace(entrypoint,
-    "globalThis.api = { createLoadingTracker, createLoadingIndicator, renderLoadingIndicator }; })();"
+    "globalThis.api = { labelForURI, createLoadingTracker, createLoadingIndicator, renderLoadingIndicator }; })();"
   ), context);
   return context.api;
 }
@@ -297,7 +298,7 @@ test("decorative render reuses a fill during loading but resets it between tabs"
   assert.equal(indicator.track.dataset.loadState, "idle");
 });
 
-function browserFixture() {
+function browserFixture({ messageManager } = {}) {
   const root = new Element();
   const byId = id => descendants(root).find(node => node.id === id);
   for (const id of ["urlbar", "urlbar-container", "tabbrowser-tabbox", "tabbrowser-tabpanels",
@@ -332,7 +333,7 @@ function browserFixture() {
   };
   const timers = new FakeTimers();
   const window = Object.assign(new Element(), {
-    gBrowser, innerWidth: 1200, innerHeight: 800,
+    gBrowser, messageManager, innerWidth: 1200, innerHeight: 800,
     setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout,
     requestAnimationFrame: callback => timers.setTimeout(() => callback(timers.now), 16),
     cancelAnimationFrame: timers.clearTimeout,
@@ -420,3 +421,94 @@ test("real split wiring isolates both bars, survives resizing, and cleans up clo
   assert.equal(f.progressListeners.size, 0);
   assert.equal(f.timers.pending.size, 0);
 });
+
+function samplerFixture() {
+  let script;
+  const browser = browserFixture({ messageManager: {
+    addMessageListener() {}, removeMessageListener() {},
+    loadFrameScript(url) { script = decodeURIComponent(url.slice(url.indexOf(",") + 1)); },
+    broadcastAsyncMessage() {}, removeDelayedFrameScript() {},
+  } });
+  const timers = new FakeTimers();
+  const events = new Element();
+  const messages = new Map();
+  const sent = [];
+  const root = { localName: "html" };
+  let color = "rgb(255, 255, 255)";
+  const content = {
+    document: { documentElement: root, body: {}, elementsFromPoint: () => [root] },
+    innerWidth: 800, innerHeight: 600,
+    getComputedStyle: () => ({ backgroundColor: color }),
+    MutationObserver: class { observe() {} disconnect() {} },
+    setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout,
+  };
+  vm.runInNewContext(script, {
+    content,
+    addEventListener: events.addEventListener.bind(events),
+    removeEventListener: events.removeEventListener.bind(events),
+    addMessageListener: (name, callback) => messages.set(name, callback),
+    removeMessageListener: name => messages.delete(name),
+    sendAsyncMessage: (name, data) => sent.push({ name, data }),
+  });
+  return { browser, timers, events, messages, sent, content,
+    setColor(value) { color = value; },
+    cleanup() {
+      messages.get("FloatingDomainBar:DestroyPageColorSampler")();
+      browser.window.__floatingDomainBarState.cleanup();
+    },
+  };
+}
+
+test("page-color requests resend an unchanged color after chrome clears its cache", () => {
+  const f = samplerFixture();
+  f.timers.advance(1800);
+  assert.equal(f.sent.length, 1);
+  f.messages.get("FloatingDomainBar:RequestPageColor")();
+  f.timers.advance(1800);
+  assert.equal(f.sent.length, 2);
+  assert.equal(f.sent[1].data.color, "rgb(255, 255, 255)");
+  f.cleanup();
+  assert.equal(f.timers.pending.size, 0);
+});
+
+test("new documents resend the same background color", () => {
+  const f = samplerFixture();
+  f.timers.advance(1800);
+  f.content.document = { ...f.content.document };
+  f.events.emit("pageshow", f.content.document);
+  f.timers.advance(1800);
+  assert.equal(f.sent.length, 2);
+  f.cleanup();
+});
+
+test("scroll sampling is throttled and removed during cleanup", () => {
+  const f = samplerFixture();
+  f.timers.advance(1800);
+  f.setColor("rgb(0, 0, 0)");
+  for (let i = 0; i < 20; i++) f.events.emit("scroll");
+  assert.equal(f.timers.pending.size, 1);
+  f.timers.advance(60);
+  assert.equal(f.sent.at(-1).data.tone, "dark");
+  f.cleanup();
+  f.events.emit("scroll");
+  assert.equal(f.timers.pending.size, 0);
+});
+
+test("manual cleanup detaches unload and is safe to repeat", () => {
+  const f = browserFixture();
+  const cleanup = f.window.__floatingDomainBarState.cleanup;
+  cleanup();
+  assert.equal(f.window.listeners.get("unload").size, 0);
+  const parent = f.byId("back-button").parentNode;
+  const order = [...parent.children];
+  cleanup();
+  assert.deepEqual(parent.children, order);
+  assert.equal(f.timers.pending.size, 0);
+});
+
+for (const [locale, expected] of [["en-US", "New Tab"], ["de", "New Tab"], ["tr-TR", "Yeni Sekme"]]) {
+  test(`domain labels follow ${locale} with an English fallback`, () => {
+    const { labelForURI } = loadHelpers(locale);
+    assert.equal(labelForURI({ scheme: "about", spec: "about:newtab" }), expected);
+  });
+}
