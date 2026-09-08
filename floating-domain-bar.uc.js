@@ -591,15 +591,35 @@
           );
         };
 
+        let colorContext = null;
+        let lastToneColor = "";
+        let lastTone = "dark";
         const toneForColor = color => {
+          if (color === lastToneColor) {
+            return lastTone;
+          }
           const match = color.match(
             /^rgba?\\(\\s*([\\d.]+)[, ]+\\s*([\\d.]+)[, ]+\\s*([\\d.]+)/i
           );
-          if (!match) {
-            return "dark";
+          let rgb = match?.slice(1, 4).map(Number);
+          if (!rgb) {
+            // Computed styles preserve OKLCH, Lab and wide-gamut CSS colors.
+            // Let Gecko convert a solid swatch to sRGB without touching the
+            // website DOM or reading any of its rendered pixels.
+            try {
+              colorContext ??= new content.OffscreenCanvas(1, 1).getContext("2d", {
+                willReadFrequently: true,
+              });
+              colorContext.clearRect(0, 0, 1, 1);
+              colorContext.fillStyle = color;
+              colorContext.fillRect(0, 0, 1, 1);
+              rgb = colorContext.getImageData(0, 0, 1, 1).data.slice(0, 3);
+            } catch {
+              return "dark";
+            }
           }
 
-          const channels = match.slice(1, 4).map(value => {
+          const channels = Array.from(rgb, value => {
             const channel = Math.max(0, Math.min(255, Number(value))) / 255;
             return channel <= 0.04045
               ? channel / 12.92
@@ -610,7 +630,9 @@
             channels[1] * 0.7152 +
             channels[2] * 0.0722;
 
-          return luminance > 0.179 ? "light" : "dark";
+          lastToneColor = color;
+          lastTone = luminance > 0.179 ? "light" : "dark";
+          return lastTone;
         };
 
         const readPageColor = () => {

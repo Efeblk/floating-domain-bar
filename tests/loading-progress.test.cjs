@@ -422,7 +422,7 @@ test("real split wiring isolates both bars, survives resizing, and cleans up clo
   assert.equal(f.timers.pending.size, 0);
 });
 
-function samplerFixture() {
+function samplerFixture({ OffscreenCanvas } = {}) {
   let script;
   const browser = browserFixture({ messageManager: {
     addMessageListener() {}, removeMessageListener() {},
@@ -436,6 +436,7 @@ function samplerFixture() {
   const root = { localName: "html" };
   let color = "rgb(255, 255, 255)";
   const content = {
+    OffscreenCanvas,
     document: { documentElement: root, body: {}, elementsFromPoint: () => [root] },
     innerWidth: 800, innerHeight: 600,
     getComputedStyle: () => ({ backgroundColor: color }),
@@ -492,6 +493,45 @@ test("scroll sampling is throttled and removed during cleanup", () => {
   f.cleanup();
   f.events.emit("scroll");
   assert.equal(f.timers.pending.size, 0);
+});
+
+test("modern color tones use converted sRGB bytes and cache unchanged samples", () => {
+  let reads = 0;
+  const context = {
+    clearRect() {}, fillRect() {},
+    getImageData() {
+      reads++;
+      const channel = this.fillStyle === "oklch(0.98 0 0)" ? 248 : 12;
+      return { data: new Uint8ClampedArray([channel, channel, channel, 255]) };
+    },
+  };
+  const f = samplerFixture({ OffscreenCanvas: class { getContext() { return context; } } });
+  f.setColor("oklch(0.98 0 0)");
+  f.timers.advance(1800);
+  assert.equal(f.sent.at(-1).data.tone, "light");
+  assert.equal(reads, 1, "settled reads must reuse the converted tone");
+  f.messages.get("FloatingDomainBar:RequestPageColor")();
+  f.timers.advance(1800);
+  assert.equal(f.sent.length, 2, "tone cache must not suppress requested messages");
+  assert.equal(reads, 1);
+  f.setColor("oklch(0.15 0 0)");
+  f.events.emit("scroll");
+  f.timers.advance(60);
+  assert.equal(f.sent.at(-1).data.tone, "dark");
+  assert.equal(reads, 2);
+  f.cleanup();
+});
+
+test("unavailable canvas conversion does not stop future RGB sampling", () => {
+  const f = samplerFixture();
+  f.setColor("lab(98 0 0)");
+  f.timers.advance(1800);
+  assert.equal(f.sent.at(-1).data.tone, "dark", "safe fallback if canvas is unavailable");
+  f.setColor("rgb(255, 255, 255)");
+  f.events.emit("scroll");
+  f.timers.advance(60);
+  assert.equal(f.sent.at(-1).data.tone, "light");
+  f.cleanup();
 });
 
 test("manual cleanup detaches unload and is safe to repeat", () => {
