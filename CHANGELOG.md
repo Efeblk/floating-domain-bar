@@ -2,6 +2,21 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## [0.20.2] - 2026-09-08
+
+### Düzeltildi
+
+- OKLCH, Lab ve Display-P3 sayfa renklerinin açık/koyu kontrastı artık
+  tarayıcının sRGB dönüşümüyle doğru belirlenir.
+- Split View adres etiketlerinde Zen'in varsayılan input stilinin renk,
+  zemin, kenarlık ve iç boşluğu değiştirmesi engellendi.
+
+### Eklendi
+
+- İzole, headless Zen profilinde renk, adres editörü, Split View, yerleşim
+  ve temizlik kontrollerini çalıştıran isteğe bağlı smoke testi.
+- Renk dönüşümü önbelleği ve canvas kullanılamadığında geri dönüş testleri.
+
 ## [0.20.1] - 2026-09-07
 
 ### Eklendi

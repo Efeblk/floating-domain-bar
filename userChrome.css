@@ -463,22 +463,26 @@
 }
 
 .floating-domain-split-input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  margin: 0;
-  padding: 0 38px;
-  appearance: none;
-  color: color-mix(in srgb, currentColor 84%, transparent);
-  font: inherit;
-  font-weight: 600;
-  line-height: 32px;
-  text-align: center;
-  text-overflow: ellipsis;
-  background: transparent;
-  border: 0;
-  outline: 0;
+  /* Sine loads a user sheet; override Zen's author-level input theme so the
+   * label keeps the panel's contrast and does not draw a second capsule. */
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 38px !important;
+  appearance: none !important;
+  color: color-mix(in srgb, currentColor 84%, transparent) !important;
+  font: inherit !important;
+  font-weight: 600 !important;
+  line-height: 32px !important;
+  text-align: center !important;
+  text-overflow: ellipsis !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
 }
 
 .floating-domain-split-bar[data-narrow] {

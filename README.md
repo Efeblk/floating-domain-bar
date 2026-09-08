@@ -50,9 +50,9 @@ Sine handles downloading and updating the mod separately.
 Supports Zen's **Only Sidebar**, **Sidebar and Top Toolbar**, and
 **Collapsed Sidebar** layouts. It depends on Zen's internal browser UI.
 
-Previously tested on Windows with Zen **1.21.16b / Gecko 154.0.1**.
-macOS and Linux have not been visually verified. The latest changes have
-passed automated tests, but still need live Zen validation.
+Smoke-tested on Windows with Zen **1.22b / Gecko 155.0** in an isolated
+headless profile, including light/dark colors and both Split View directions.
+macOS, Linux, and native window dragging have not been validated in this pass.
 
 Other mods that reposition the address bar or navigation controls may conflict.
 If the UI does not update, reinstall the mod through Sine and restart Zen.
@@ -74,6 +74,18 @@ Actions runs these checks on pushes and pull requests.
 For visual validation, test single tabs and Split View, light and dark pages,
 all three Zen layouts, narrow windows, Compact Mode, native URL editing,
 and disabling/re-enabling the mod after a restart.
+
+An optional live browser smoke test requires Python and Mozilla's
+`marionette_driver` package:
+
+```sh
+python -m pip install marionette_driver
+python tests/zen-smoke.py --binary "C:\Program Files\Zen Browser\zen.exe"
+```
+
+It launches a separate headless Zen profile, exercises the actual CSS and
+JavaScript, and saves screenshots and results in a temporary directory.
+It does not use your normal Zen profile. The Node tests remain dependency-free.
 
 ## Files
 
