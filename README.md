@@ -38,6 +38,7 @@ This is a Sine package for Zen, not a Firefox extension or a CSS-only Zen theme.
 - Independent address bars and loading indicators in Split View.
 - Page-edge color sampling with adaptive light/dark contrast.
 - Responsive sizing for Zen's three layouts and Compact Mode.
+- Native window dragging and Windows edge snapping from the blank header.
 - Reduced-motion support for loading animations.
 - English interface labels, with Turkish labels for Turkish browser locales.
 
@@ -52,7 +53,9 @@ Supports Zen's **Only Sidebar**, **Sidebar and Top Toolbar**, and
 
 Smoke-tested on Windows with Zen **1.22b / Gecko 155.0** in an isolated
 headless profile, including light/dark colors and both Split View directions.
-macOS, Linux, and native window dragging have not been validated in this pass.
+Windows edge snapping was also checked with mouse drags in a separate visible
+profile, using Only Sidebar and Sidebar and Top Toolbar layouts.
+macOS and Linux have not been validated.
 
 Other mods that reposition the address bar or navigation controls may conflict.
 If the UI does not update, reinstall the mod through Sine and restart Zen.

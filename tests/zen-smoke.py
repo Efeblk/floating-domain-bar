@@ -157,7 +157,26 @@ def main():
             time.sleep(0.5)
             assert chrome("""const e=document.getElementById('floating-domain-bar-domain'), r=e.getBoundingClientRect();
               return r.width>0 && r.left>=0 && r.right<=window.innerWidth && getComputedStyle(e).visibility==='visible';""")
-            passed(f"browser layout: {mode}")
+            assert chrome("""const drag=document.getElementById('floating-domain-bar-drag-region');
+              const r=drag.getBoundingClientRect(), y=r.top+r.height/2;
+              let hasBlankHeader=false;
+              for(let x=Math.max(0,r.left)+2;x<Math.min(innerWidth,r.right);x+=4) {
+                if(document.elementFromPoint(x,y)===drag) { hasBlankHeader=true; break; }
+              }
+              return hasBlankHeader && ['floating-domain-bar-domain','back-button','PanelUI-button'].every(id=>{
+                const e=document.getElementById(id), b=e.getBoundingClientRect();
+                // Zen hides its menu button in some toolbar layouts.
+                if(id==='PanelUI-button' && !b.width && !b.height) return true;
+                const hit=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);
+                return e===hit || e.contains(hit);
+              });"""), f"Header drag region must leave controls clickable: {mode}"
+            chrome("document.getElementById('floating-domain-bar-domain').click();")
+            wait_for(lambda: chrome("return document.activeElement===gURLBar.inputField && getComputedStyle(gURLBar.inputField).visibility==='visible';"), f"visible editor: {mode}")
+            client.find_element("css selector", "#urlbar-input").send_keys(Keys.ESCAPE)
+            assert chrome("""return [...document.querySelectorAll('.titlebar-button')].every(e=>{
+              const r=e.getBoundingClientRect(); return !r.width || getComputedStyle(e).visibility==='visible';
+            });"""), f"Window controls must remain visible: {mode}"
+            passed(f"browser layout: {mode}, header hit targets, editor and window controls")
         chrome("gZenCompactModeManager.toggle();")
         wait_for(lambda: chrome("return document.documentElement.getAttribute('zen-compact-mode')==='true';"), "compact mode")
         time.sleep(0.6)

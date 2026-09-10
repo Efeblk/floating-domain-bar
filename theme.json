@@ -3,9 +3,9 @@
   "name": "Floating Domain Bar",
   "description": "Adds a real top browser row with visible-edge color sampling and adaptive light/dark materials, without modifying website layouts.",
   "author": "Efeblk",
-  "version": "0.20.2",
+  "version": "0.20.3",
   "createdAt": "2026-08-29",
-  "updatedAt": "2026-09-08",
+  "updatedAt": "2026-09-10",
   "style": {
     "chrome": "userChrome.css"
   },
