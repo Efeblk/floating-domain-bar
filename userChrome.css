@@ -190,6 +190,9 @@
   margin: 0 !important;
   overflow: visible !important;
   pointer-events: none !important;
+  /* Explicitly hide this no-drag box: author styles can override visibility
+   * inherited from the hidden navbar and block the upper 40px of the header. */
+  visibility: hidden !important;
   -moz-window-dragging: no-drag !important;
 }
 
