@@ -88,6 +88,10 @@ def main():
           window.smokeOriginalControls = ['back-button','forward-button','stop-reload-button','PanelUI-button']
             .map(id => { const node=document.getElementById(id); return {node,parent:node.parentNode,next:node.nextSibling}; });
           window.windowUtils.loadSheet(Services.io.newURI(arguments[0]), window.windowUtils.USER_SHEET);
+          // Explicit author visibility must not revive the dormant no-drag box.
+          const visibilityStyle=document.createElementNS('http://www.w3.org/1999/xhtml','style');
+          visibilityStyle.textContent='#urlbar-container { visibility: visible; }';
+          document.documentElement.appendChild(visibilityStyle);
         """, (root / "userChrome.css").as_uri())
         chrome(source)
         wait_for(lambda: chrome("return !!window.__floatingDomainBarState;"), "mod initialization")
@@ -170,6 +174,7 @@ def main():
                 const hit=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);
                 return e===hit || e.contains(hit);
               });"""), f"Header drag region must leave controls clickable: {mode}"
+            assert chrome("return getComputedStyle(document.getElementById('urlbar-container')).visibility==='hidden';"), f"Dormant no-drag container must stay hidden: {mode}"
             chrome("document.getElementById('floating-domain-bar-domain').click();")
             wait_for(lambda: chrome("return document.activeElement===gURLBar.inputField && getComputedStyle(gURLBar.inputField).visibility==='visible';"), f"visible editor: {mode}")
             client.find_element("css selector", "#urlbar-input").send_keys(Keys.ESCAPE)

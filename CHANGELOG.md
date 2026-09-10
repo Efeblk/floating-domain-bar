@@ -2,6 +2,15 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## [0.20.4] - 2026-09-10
+
+### Düzeltildi
+
+- Yerel adres çubuğu kapsayıcısı açıkça gizlenerek üst satırın ilk 40 pikselinde
+  Windows Snap sürüklemesini engelleyen görünmez alan kaldırıldı.
+- Normal Zen profilinde üst boşluktan sağ kenara sürükleme ve Ctrl+L ile
+  adres düzenleme Computer Use ile doğrulandı.
+
 ## [0.20.3] - 2026-09-10
 
 ### Düzeltildi
