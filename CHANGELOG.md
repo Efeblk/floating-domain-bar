@@ -2,6 +2,17 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## [0.20.3] - 2026-09-10
+
+### Düzeltildi
+
+- Boş üst satırdan sürüklerken Windows Snap artık yerel başlık çubuğu
+  sürükleme bölgesini kullanır; elle `moveTo()` ile pencere taşıma kaldırıldı.
+- Büyütülmüş pencereden sürükleme işletim sistemine bırakıldı; çift tıklamayla
+  büyütme ve geri yükleme korundu.
+- Boş yerel araç çubuğunun görünmez `no-drag` katmanının üst satırda
+  pencere sürüklemeyi engellemesi giderildi.
+
 ## [0.20.2] - 2026-09-08
 
 ### Düzeltildi

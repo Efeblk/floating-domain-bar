@@ -264,171 +264,8 @@
     dragRegion.id = DRAG_REGION_ID;
     dragRegion.setAttribute("aria-hidden", "true");
 
-    let windowDragState = null;
-    let windowRestoreFrame = 0;
-
-    const stopWindowDrag = event => {
-      const state = windowDragState;
-
-      if (!state) {
-        return;
-      }
-
-      windowDragState = null;
-
-      if (windowRestoreFrame) {
-        window.cancelAnimationFrame(windowRestoreFrame);
-        windowRestoreFrame = 0;
-      }
-
-      try {
-        if (dragRegion.hasPointerCapture?.(state.pointerId)) {
-          dragRegion.releasePointerCapture(state.pointerId);
-        }
-      } catch {
-        // Pointer capture may already be released by the platform.
-      }
-
-      window.removeEventListener("pointermove", onWindowDragMove, true);
-      window.removeEventListener("pointerup", stopWindowDrag, true);
-      window.removeEventListener("pointercancel", stopWindowDrag, true);
-      document.documentElement.removeAttribute(
-        "floating-domain-bar-window-dragging"
-      );
-
-      if (state.started) {
-        event?.preventDefault?.();
-      }
-    };
-
-    const moveWindowToPointer = state => {
-      if (windowDragState !== state) {
-        return;
-      }
-
-      window.moveTo(
-        Math.round(state.lastScreenX - state.anchorX),
-        Math.round(state.lastScreenY - state.anchorY)
-      );
-    };
-
-    const finishWindowRestore = state => {
-      if (windowDragState !== state) {
-        return;
-      }
-
-      if (
-        window.windowState !== window.STATE_NORMAL &&
-        state.restoreAttempts < 4
-      ) {
-        state.restoreAttempts += 1;
-        windowRestoreFrame = window.requestAnimationFrame(() =>
-          finishWindowRestore(state)
-        );
-        return;
-      }
-
-      windowRestoreFrame = 0;
-      state.pendingRestore = false;
-      state.anchorX = Math.round(
-        window.outerWidth * state.horizontalPointerRatio
-      );
-      state.anchorY = Math.min(24, Math.max(8, state.initialClientY));
-      moveWindowToPointer(state);
-    };
-
-    function onWindowDragMove(event) {
-      const state = windowDragState;
-
-      if (!state || event.pointerId !== state.pointerId) {
-        return;
-      }
-
-      if (!(event.buttons & 1)) {
-        stopWindowDrag(event);
-        return;
-      }
-
-      state.lastScreenX = event.screenX;
-      state.lastScreenY = event.screenY;
-
-      if (!state.started) {
-        const distance = Math.hypot(
-          event.screenX - state.startScreenX,
-          event.screenY - state.startScreenY
-        );
-
-        if (distance < 4) {
-          return;
-        }
-
-        state.started = true;
-        document.documentElement.setAttribute(
-          "floating-domain-bar-window-dragging",
-          "true"
-        );
-
-        if (state.wasMaximized) {
-          state.pendingRestore = true;
-          window.restore();
-          windowRestoreFrame = window.requestAnimationFrame(() =>
-            finishWindowRestore(state)
-          );
-          event.preventDefault();
-          return;
-        }
-      }
-
-      if (!state.pendingRestore) {
-        moveWindowToPointer(state);
-      }
-
-      event.preventDefault();
-    }
-
-    const onWindowDragStart = event => {
-      if (
-        event.button !== 0 ||
-        !event.isPrimary ||
-        window.fullScreen ||
-        window.windowState === window.STATE_FULLSCREEN
-      ) {
-        return;
-      }
-
-      stopWindowDrag();
-
-      const wasMaximized = window.windowState === window.STATE_MAXIMIZED;
-      windowDragState = {
-        pointerId: event.pointerId,
-        startScreenX: event.screenX,
-        startScreenY: event.screenY,
-        lastScreenX: event.screenX,
-        lastScreenY: event.screenY,
-        initialClientY: event.clientY,
-        horizontalPointerRatio: Math.max(
-          0,
-          Math.min(1, event.clientX / Math.max(1, window.innerWidth))
-        ),
-        anchorX: event.screenX - window.screenX,
-        anchorY: event.screenY - window.screenY,
-        wasMaximized,
-        pendingRestore: false,
-        restoreAttempts: 0,
-        started: false,
-      };
-
-      try {
-        dragRegion.setPointerCapture?.(event.pointerId);
-      } catch {
-        // Window-level listeners still provide a safe fallback.
-      }
-
-      window.addEventListener("pointermove", onWindowDragMove, true);
-      window.addEventListener("pointerup", stopWindowDrag, true);
-      window.addEventListener("pointercancel", stopWindowDrag, true);
-    };
-
+    // CSS delegates dragging to the native window manager so Windows Snap works.
+    // This custom XUL target still needs its own double-click action.
     const onWindowDragDoubleClick = event => {
       if (event.button !== 0 || window.fullScreen) {
         return;
@@ -443,7 +280,6 @@
       event.preventDefault();
     };
 
-    dragRegion.addEventListener("pointerdown", onWindowDragStart);
     dragRegion.addEventListener("dblclick", onWindowDragDoubleClick);
 
     const layout = document.createXULElement("hbox");
@@ -1626,8 +1462,6 @@
         }
       }
 
-      stopWindowDrag();
-      dragRegion.removeEventListener("pointerdown", onWindowDragStart);
       dragRegion.removeEventListener("dblclick", onWindowDragDoubleClick);
       splitLayer.remove();
       layout.remove();

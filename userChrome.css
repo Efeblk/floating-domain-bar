@@ -1,6 +1,6 @@
 /*
  * Floating Domain Bar
- * Tested against Zen 1.21.16b / Gecko 154 on Windows.
+ * Tested against Zen 1.22b / Gecko 155 on Windows.
  */
 
 :root {
@@ -116,6 +116,7 @@
   inset: 0 0 auto auto !important;
   z-index: 1100 !important;
   display: flex !important;
+  visibility: visible !important;
   align-items: stretch !important;
   width: auto !important;
   height: 40px !important;
@@ -162,6 +163,13 @@
 }
 
 /* Once JS relocates the useful controls, suppress the now-empty toolbar row. */
+:root[floating-domain-bar-layout-ready]:not([customizing]) #nav-bar {
+  /* Even with pointer-events:none, painted no-drag descendants subtract from
+   * Gecko's native drag region. Hide the empty row; the window controls and
+   * active floating URL editor explicitly restore their own visibility. */
+  visibility: hidden !important;
+}
+
 :root[floating-domain-bar-layout-ready]:not([customizing])
   #nav-bar
   > :not(#nav-bar-customization-target):not(.titlebar-buttonbox-container),
@@ -225,12 +233,7 @@
   height: var(--floating-domain-bar-reserved-space) !important;
   background: transparent !important;
   pointer-events: auto !important;
-  -moz-window-dragging: no-drag !important;
-}
-
-:root[floating-domain-bar-window-dragging] {
-  cursor: default !important;
-  user-select: none !important;
+  -moz-window-dragging: drag !important;
 }
 
 /* Full-width chrome row; only its centered address field has a surface. */
