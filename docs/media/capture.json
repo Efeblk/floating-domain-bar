@@ -1,0 +1,10 @@
+{
+  "zen": "1.22.2b",
+  "mod": "0.20.4",
+  "viewport": [
+    1440,
+    900
+  ],
+  "gif": "Actual captured states; edited timing, not real-time recording.",
+  "pages": "Local demo fixtures from tools/capture-media.py; browser chrome is unmodified beyond the mod."
+}

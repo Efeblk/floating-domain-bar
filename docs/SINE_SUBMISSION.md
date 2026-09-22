@@ -3,6 +3,32 @@
 The package supports repository installation. Listing it in Sine's marketplace
 requires a separate review by the store maintainers.
 
+## Ready for submission
+
+- Package: **Floating Domain Bar v0.20.4**, for Zen.
+- Repository: https://github.com/Efeblk/floating-domain-bar
+- Preview: [overview GIF](media/demo.gif), [screenshots and short demos](media/README.md).
+- Captures: real Zen **1.22.2b** browser UI on Windows with local demo pages.
+  GIF timing is edited; macOS and Linux are not yet validated.
+- On **2026-09-22**, the store index had no `floating-domain-bar` entry and
+  the store issue/PR search found no matching repository submission.
+  Repeat that check immediately before submitting.
+
+The submission form only requires the repository URL. If creating the issue
+through the GitHub API, use the title below, the `theme-submission` label, and
+this exact body so the store's form parser can read it:
+
+Title: `[add-theme]: Floating Domain Bar`
+
+```markdown
+### Theme Homepage
+
+https://github.com/Efeblk/floating-domain-bar
+```
+
+The submission has not been sent. A merged PR in this repository makes the
+package available for repository installation; store approval is separate.
+
 ## Publish and verify
 
 1. Run the checks in README.md and perform live Zen validation.
