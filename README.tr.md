@@ -6,6 +6,9 @@
 
 Sine mağaza başvurusu ve yayınlama adımları: [başvuru rehberi](docs/SINE_SUBMISSION.md).
 
+[Ekran görüntüleri ve kısa demolar](docs/media/README.md) — gerçek Zen
+arayüzü ve yerel demo sayfaları; GIF zamanlamaları düzenlenmiştir.
+
 Zen Browser için minimal, responsive bir adres çubuğu modu. Tarayıcının üstünde
 gerçek bir alan ayırır; boşta tam URL yerine yalnızca sitenin ana alan adını
 gösterir.

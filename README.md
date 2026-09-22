@@ -12,6 +12,11 @@ https://www.youtube.com/watch?v=abc  →  youtube.com
 https://mail.google.com/            →  google.com
 ```
 
+![Floating Domain Bar switching between light and dark pages, native address editing, and Split View](docs/media/demo.gif)
+
+Actual Zen captures using local demo pages; the GIF uses edited timing.
+[Screenshots and short demos](docs/media/README.md)
+
 ## Install with Sine
 
 1. Install [Zen Browser](https://zen-browser.app/) and
