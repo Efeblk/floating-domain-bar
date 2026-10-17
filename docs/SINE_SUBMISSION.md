@@ -3,31 +3,30 @@
 The package supports repository installation. Listing it in Sine's marketplace
 requires a separate review by the store maintainers.
 
-## Ready for submission
+## Package
 
 - Package: **Floating Domain Bar v0.20.5**, for Zen.
 - Repository: https://github.com/Efeblk/floating-domain-bar
 - Preview: [overview GIF](media/demo.gif), [screenshots and short demos](media/README.md).
 - Captures: real Zen **1.22.2b** browser UI on Windows with local demo pages.
   GIF timing is edited; macOS and Linux are not yet validated.
-- On **2026-09-22**, the store index had no `floating-domain-bar` entry and
-  the store issue/PR search found no matching repository submission.
-  Repeat that check immediately before submitting.
+- Captures predate the Zen 1.23 window-control fix in v0.20.5; the header
+  layout they show is unchanged.
 
-The submission form only requires the repository URL. If creating the issue
-through the GitHub API, use the title below, the `theme-submission` label, and
-this exact body so the store's form parser can read it:
+## Submission status
 
-Title: `[add-theme]: Floating Domain Bar`
+Submitted on **2026-09-22** as store issue
+[#1231](https://github.com/sineorg/store/issues/1231), which the store's
+automation closed after opening PR
+[#1232](https://github.com/sineorg/store/pull/1232). As of **2026-10-17** that
+PR is open and unreviewed, and has conflicts in `marketplace.json`. Other new-mod
+PRs back to July are also still open; only update PRs for listed mods are
+being merged. Do not open another submission. Leave conflict resolution to the
+maintainers' automation unless they ask.
 
-```markdown
-### Theme Homepage
-
-https://github.com/Efeblk/floating-domain-bar
-```
-
-The submission has not been sent. A merged PR in this repository makes the
-package available for repository installation; store approval is separate.
+The PR snapshots v0.20.4. Once listed, the store's update workflow pulls the
+current `theme.json` from `homepage`, so later releases need no new
+submission.
 
 ## Publish and verify
 
