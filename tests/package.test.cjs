@@ -16,11 +16,13 @@ test("Sine metadata identifies the public Zen package and update source", () => 
   assert.equal(theme.homepage, "https://github.com/Efeblk/floating-domain-bar");
   assert.match(theme.version, /^\d+\.\d+\.\d+$/);
   assert.deepEqual(theme.fork, ["zen"]);
-  for (const field of ["createdAt", "updatedAt"]) {
-    assert.match(theme[field], /^\d{4}-\d{2}-\d{2}$/);
-    assert.equal(new Date(theme[field]).toISOString().slice(0, 10), theme[field]);
-  }
-  assert.ok(theme.updatedAt >= theme.createdAt);
+  assert.match(theme.createdAt, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(new Date(theme.createdAt).toISOString().slice(0, 10), theme.createdAt);
+  // Sine updates only when updatedAt is strictly later, ignoring version, so a
+  // date-only value would hide a second release on the same day.
+  assert.match(theme.updatedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.equal(new Date(theme.updatedAt).toISOString().replace(".000", ""), theme.updatedAt);
+  assert.ok(new Date(theme.updatedAt) > new Date(theme.createdAt));
 });
 
 test("Sine can resolve all registered package files from the repository root", () => {
