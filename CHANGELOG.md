@@ -2,6 +2,16 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## [0.20.5] - 2026-10-17
+
+### Düzeltildi
+
+- Zen 1.23'te Yalnızca Kenar Çubuğu düzeninde sağ üstteki küçült, büyüt ve
+  kapat düğmeleri görünmez hâle geliyordu. Zen'in `zen.view.hide-window-controls`
+  ile yaptığı otomatik gizleme (sarmalayıcının opaklığı ve düğme kutusunun
+  sıfır yüksekliği) mod etkinken geçersiz kılındı; tam ekranda gizleme korunur.
+- Smoke testi artık pencere düğmelerinin opaklığını ve yüksekliğini de denetler.
+
 ## [0.20.4] - 2026-09-10
 
 ### Düzeltildi

@@ -5,7 +5,7 @@ requires a separate review by the store maintainers.
 
 ## Ready for submission
 
-- Package: **Floating Domain Bar v0.20.4**, for Zen.
+- Package: **Floating Domain Bar v0.20.5**, for Zen.
 - Repository: https://github.com/Efeblk/floating-domain-bar
 - Preview: [overview GIF](media/demo.gif), [screenshots and short demos](media/README.md).
 - Captures: real Zen **1.22.2b** browser UI on Windows with local demo pages.

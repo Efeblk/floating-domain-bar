@@ -56,7 +56,7 @@ Sine handles downloading and updating the mod separately.
 Supports Zen's **Only Sidebar**, **Sidebar and Top Toolbar**, and
 **Collapsed Sidebar** layouts. It depends on Zen's internal browser UI.
 
-Smoke-tested on Windows with Zen **1.22b / Gecko 155.0** in an isolated
+Smoke-tested on Windows with Zen **1.23.3b / Gecko 158.0** in an isolated
 headless profile, including light/dark colors and both Split View directions.
 Windows edge snapping was also checked with mouse drags in a separate visible
 profile, using Only Sidebar and Sidebar and Top Toolbar layouts.

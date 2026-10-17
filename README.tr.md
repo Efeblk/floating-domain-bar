@@ -118,7 +118,7 @@ için Zen'de tek sekme/split, açık/koyu sayfa ve pencere boyutları ayrıca de
 
 ## Uyumluluk
 
-Windows üzerinde Zen `1.22b` / Gecko `155.0` ile test edilmiştir. Boş üst satırdan
+Windows üzerinde Zen `1.23.3b` / Gecko `158.0` ile test edilmiştir. Boş üst satırdan
 Windows Snap ile kenara yerleştirme, ayrı bir görünür profilde Only Sidebar ve
 Sidebar and Top Toolbar yerleşimlerinde fareyle doğrulandı. Zen'in
 dahili arayüz kimlikleri sürümler arasında değişebildiği için gelecekteki büyük

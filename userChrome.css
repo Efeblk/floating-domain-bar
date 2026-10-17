@@ -162,6 +162,22 @@
   fill: currentColor !important;
 }
 
+/* Zen 1.23 auto-hides the controls in Only Sidebar (zen.view.hide-window-controls)
+ * by fading the wrapper and collapsing the button box until its strip is
+ * hovered. That strip is replaced by this header, so keep them painted. */
+:root[floating-domain-bar-layout-ready]:not([customizing]):not([inDOMFullscreen="true"])
+  #zen-appcontent-navbar-wrapper {
+  opacity: 1 !important;
+  transition: none !important;
+}
+
+:root[floating-domain-bar-layout-ready]:not([customizing]):not([inDOMFullscreen="true"])
+  #zen-appcontent-navbar-wrapper
+  .titlebar-buttonbox-container {
+  max-height: none !important;
+  transition: none !important;
+}
+
 /* Once JS relocates the useful controls, suppress the now-empty toolbar row. */
 :root[floating-domain-bar-layout-ready]:not([customizing]) #nav-bar {
   /* Even with pointer-events:none, painted no-drag descendants subtract from
