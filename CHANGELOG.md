@@ -2,6 +2,17 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## [0.20.6] - 2026-10-17
+
+### Düzeltildi
+
+- Kompakt Mod'da araç çubuğu gizlenirken (`zen.view.compact.hide-toolbar`) Zen
+  1.23'ün sarmalayıcıya verdiği `contain: layout paint`, sıfır yükseklikteki
+  sarmalayıcı içinde pencere düğmelerini kırpıyordu; düğmeler ne görünüyor ne
+  de tıklanabiliyordu. Mod etkinken bu kapsama kaldırıldı.
+- Smoke testi Kompakt Mod'da pencere düğmelerinin görünürlüğünü ve
+  tıklanabilirliğini de denetler.
+
 ## [0.20.5] - 2026-10-17
 
 ### Düzeltildi

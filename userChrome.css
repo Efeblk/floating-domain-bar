@@ -164,10 +164,13 @@
 
 /* Zen 1.23 auto-hides the controls in Only Sidebar (zen.view.hide-window-controls)
  * by fading the wrapper and collapsing the button box until its strip is
- * hovered. That strip is replaced by this header, so keep them painted. */
+ * hovered. That strip is replaced by this header, so keep them painted.
+ * Compact Mode also gives the wrapper paint containment, which clips the
+ * fixed-position controls to its zero height. */
 :root[floating-domain-bar-layout-ready]:not([customizing]):not([inDOMFullscreen="true"])
   #zen-appcontent-navbar-wrapper {
   opacity: 1 !important;
+  contain: none !important;
   transition: none !important;
 }
 

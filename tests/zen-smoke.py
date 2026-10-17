@@ -76,6 +76,19 @@ def main():
             '<div style="height:1800px"></div></body></html>'
         )
 
+    def assert_window_controls(mode):
+        # Headless Zen does not paint caption glyphs, so check every ancestor:
+        # Zen 1.23 hides the controls via wrapper opacity and a zero max-height
+        # in Only Sidebar, and clips them with paint containment in Compact Mode.
+        assert chrome("""return [...document.querySelectorAll('.titlebar-button')].every(e=>{
+          const r=e.getBoundingClientRect(); if(!r.width) return true;
+          const box=e.closest('.titlebar-buttonbox-container');
+          if(getComputedStyle(e).visibility!=='visible' || box.getBoundingClientRect().height<r.height) return false;
+          for(let n=e;n;n=n.parentElement) if(getComputedStyle(n).opacity==='0') return false;
+          const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+          return e===hit || e.contains(hit);
+        });"""), f"Window controls must remain visible and clickable: {mode}"
+
     try:
         client.raise_for_port(timeout=30)
         client.start_session()
@@ -178,24 +191,21 @@ def main():
             chrome("document.getElementById('floating-domain-bar-domain').click();")
             wait_for(lambda: chrome("return document.activeElement===gURLBar.inputField && getComputedStyle(gURLBar.inputField).visibility==='visible';"), f"visible editor: {mode}")
             client.find_element("css selector", "#urlbar-input").send_keys(Keys.ESCAPE)
-            # Headless Zen does not paint caption glyphs, so check every
-            # ancestor: Zen 1.23 hides the controls via wrapper opacity and a
-            # zero max-height in Only Sidebar.
-            assert chrome("""return [...document.querySelectorAll('.titlebar-button')].every(e=>{
-              const r=e.getBoundingClientRect(); if(!r.width) return true;
-              const box=e.closest('.titlebar-buttonbox-container');
-              if(getComputedStyle(e).visibility!=='visible' || box.getBoundingClientRect().height<r.height) return false;
-              for(let n=e;n;n=n.parentElement) if(getComputedStyle(n).opacity==='0') return false;
-              return true;
-            });"""), f"Window controls must remain visible: {mode}"
+            assert_window_controls(mode)
             passed(f"browser layout: {mode}, header hit targets, editor and window controls")
-        chrome("gZenCompactModeManager.toggle();")
+        # Hiding the top toolbar is what gives Zen's wrapper paint containment.
+        chrome("Services.prefs.setBoolPref('zen.view.compact.hide-toolbar',true); gZenCompactModeManager.toggle();")
         wait_for(lambda: chrome("return document.documentElement.getAttribute('zen-compact-mode')==='true';"), "compact mode")
         time.sleep(0.6)
         assert chrome("""const r=document.getElementById('floating-domain-bar-domain').getBoundingClientRect();
           return r.width>0 && r.left>=0 && r.right<=window.innerWidth;""")
+        assert_window_controls("compact collapsed-sidebar")
+        chrome("Services.prefs.setBoolPref('zen.view.sidebar-expanded',true);")
+        wait_for(lambda: chrome("return document.documentElement.getAttribute('floating-domain-bar-browser-layout')==='sidebar-and-top-toolbar';"), "compact sidebar-and-top-toolbar")
+        time.sleep(0.6)
+        assert_window_controls("compact sidebar-and-top-toolbar")
         chrome("gZenCompactModeManager.toggle();")
-        passed("Compact Mode keeps domain capsule in viewport")
+        passed("Compact Mode keeps domain capsule in viewport and window controls visible")
         client.set_window_rect(width=640, height=600)
         time.sleep(0.6)
         rect = chrome("return document.getElementById('floating-domain-bar-domain').getBoundingClientRect().toJSON();")
