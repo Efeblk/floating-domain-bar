@@ -2,6 +2,14 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## [0.20.7] - 2026-10-17
+
+### Düzeltildi
+
+- Sine güncellemeyi yalnızca `updatedAt` daha yeniyse kurar; 0.20.5 ve 0.20.6
+  aynı tarihi taşıdığı için 0.20.6 kurulu kullanıcılara ulaşmıyordu.
+  `updatedAt` artık tam UTC zaman damgasıdır ve paket testi bunu zorunlu kılar.
+
 ## [0.20.6] - 2026-10-17
 
 ### Düzeltildi

@@ -5,7 +5,7 @@ requires a separate review by the store maintainers.
 
 ## Package
 
-- Package: **Floating Domain Bar v0.20.6**, for Zen.
+- Package: **Floating Domain Bar v0.20.7**, for Zen.
 - Repository: https://github.com/Efeblk/floating-domain-bar
 - Preview: [overview GIF](media/demo.gif), [screenshots and short demos](media/README.md).
 - Captures: real Zen **1.22.2b** browser UI on Windows with local demo pages.
@@ -63,6 +63,9 @@ installation until the entry is available.
   repository root. There is no build step.
 - Restrict the mod to Zen with `fork: ["zen"]`; the script uses Zen internals.
 - Bump `version`, `updatedAt`, and CHANGELOG.md together when publishing updates.
+  Sine installs an update only when `updatedAt` is strictly later than the
+  installed copy's; it ignores `version` and release tags. Use a full UTC
+  timestamp (`2026-10-17T13:55:00Z`) so same-day releases reach users.
 - Include only actual screenshots if adding a store preview; automated tests
   do not establish visual compatibility on untested platforms.
 
