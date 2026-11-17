@@ -2,6 +2,22 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## [0.21.0] - 2026-11-18
+
+### Düzeltildi
+
+- Yer imleri araç çubuğu (Ctrl+Shift+B) görünmüyor ve tıklanamıyordu: Zen onu
+  `#nav-bar` ile aynı, mod tarafından sıfır yüksekliğe indirilen sarmalayıcıya
+  koyuyor ve üst satırın sürükleme alanı üzerini kapatıyordu. Çubuk artık
+  52 px başlığın hemen altında kendi 30 px satırında durur; panellerin ayrılmış
+  alanı yalnızca çubuk açıkken büyür ve sürükleme alanı başlıkla sınırlıdır.
+- Split View'da yer imlerinin rengi sol üst panelin açık/koyu tonunu izler;
+  pencere düğmeleri için kullanılan sağ kenar tonu koyu panelde koyu yazıya
+  yol açıyordu.
+- Smoke testi Zen 1.24'te başlangıç sekmesini (`zen-empty-tab`) Split View'a
+  alamadığı için takılıyordu; artık iki yeni sekme kullanır. Yer imleri çubuğu
+  için düzen, tıklanabilirlik ve Split View denetimleri eklendi.
+
 ## [0.20.7] - 2026-10-17
 
 ### Düzeltildi

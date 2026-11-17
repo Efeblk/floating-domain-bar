@@ -41,6 +41,7 @@ This is a Sine package for Zen, not a Firefox extension or a CSS-only Zen theme.
 - Base-domain labels without changing the actual URL.
 - Native URL editing and browser navigation controls.
 - Independent address bars and loading indicators in Split View.
+- Bookmarks toolbar (Ctrl+Shift+B) kept as its own clickable row below the bar.
 - Page-edge color sampling with adaptive light/dark contrast.
 - Responsive sizing for Zen's three layouts and Compact Mode.
 - Native window dragging and Windows edge snapping from the blank header.
@@ -56,10 +57,11 @@ Sine handles downloading and updating the mod separately.
 Supports Zen's **Only Sidebar**, **Sidebar and Top Toolbar**, and
 **Collapsed Sidebar** layouts. It depends on Zen's internal browser UI.
 
-Smoke-tested on Windows with Zen **1.23.3b / Gecko 158.0** in an isolated
-headless profile, including light/dark colors and both Split View directions.
-Windows edge snapping was also checked with mouse drags in a separate visible
-profile, using Only Sidebar and Sidebar and Top Toolbar layouts.
+Smoke-tested on Windows with Zen **1.24.1b / Gecko 159.0.1** in an isolated
+headless profile, including light/dark colors, both Split View directions and
+the bookmarks toolbar. Windows edge snapping was checked with mouse drags on
+Zen 1.23.3b in a separate visible profile, using Only Sidebar and Sidebar and
+Top Toolbar layouts.
 macOS and Linux have not been validated.
 
 Other mods that reposition the address bar or navigation controls may conflict.

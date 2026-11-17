@@ -129,8 +129,11 @@ def main():
         client.find_element("css selector", "#urlbar-input").send_keys(Keys.ESCAPE)
         passed("domain click focuses and selects native address editor")
 
-        chrome("""window.smokeTabs=[gBrowser.selectedTab,gBrowser.addTab(arguments[0],
-          {triggeringPrincipal:Services.scriptSecurityManager.getSystemPrincipal()})];""", page("oklch(0.98 0 0)", "Light"))
+        # Zen 1.24 marks the startup tab as zen-empty-tab, which splitTabs()
+        # silently drops, so split two fresh tabs instead.
+        chrome("""const opts={triggeringPrincipal:Services.scriptSecurityManager.getSystemPrincipal()};
+          window.smokeTabs=[gBrowser.addTab(arguments[0],opts),gBrowser.addTab(arguments[1],opts)];
+          gBrowser.selectedTab=window.smokeTabs[0];""", page("lab(5 0 0)", "Dark"), page("oklch(0.98 0 0)", "Light"))
         for direction in ["vsep", "hsep"]:
             chrome("gZenViewSplitter.splitTabs(window.smokeTabs,arguments[0]);", direction)
             wait_for(lambda: chrome("return document.querySelectorAll('.floating-domain-split-bar').length===2;"), direction)
@@ -193,6 +196,51 @@ def main():
             client.find_element("css selector", "#urlbar-input").send_keys(Keys.ESCAPE)
             assert_window_controls(mode)
             passed(f"browser layout: {mode}, header hit targets, editor and window controls")
+        # Zen hosts the bookmarks toolbar beside #nav-bar in the collapsed navbar
+        # wrapper; it must get its own visible, clickable row below the header.
+        chrome("""PlacesUtils.bookmarks.insert({parentGuid:PlacesUtils.bookmarks.toolbarGuid,
+          url:'https://example.com/',title:'Smoke bookmark'});
+          setToolbarVisibility(document.getElementById('PersonalToolbar'),'always');""")
+        wait_for(lambda: chrome("""return document.documentElement.hasAttribute('zen-has-bookmarks')
+          && !!document.querySelector('#PlacesToolbarItems .bookmark-item');"""), "bookmarks toolbar")
+        for expanded, single, mode in [
+            (True, True, "only-sidebar"), (True, False, "sidebar-and-top-toolbar"),
+            (False, False, "collapsed-sidebar"),
+        ]:
+            chrome("""Services.prefs.setBoolPref('zen.view.sidebar-expanded',arguments[0]);
+              Services.prefs.setBoolPref('zen.view.use-single-toolbar',arguments[1]);""", expanded, single)
+            wait_for(lambda: chrome("return document.documentElement.getAttribute('floating-domain-bar-browser-layout')===arguments[0];", mode), mode)
+            time.sleep(0.5)
+            problem = chrome("""const item=document.querySelector('#PlacesToolbarItems .bookmark-item');
+              const r=item.getBoundingClientRect(), domain=document.getElementById('floating-domain-bar-domain').getBoundingClientRect();
+              const web=gBrowser.selectedBrowser.getBoundingClientRect();
+              if(!r.width || !r.height || getComputedStyle(item).visibility!=='visible') return 'not painted '+JSON.stringify(r);
+              const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+              if(!(item===hit || item.contains(hit))) return 'not clickable, hit '+(hit&&(hit.id||hit.localName));
+              if(r.top<domain.bottom) return 'overlaps domain bar';
+              if(r.bottom>web.top+1) return 'overlaps web content '+r.bottom+'>'+web.top;
+              return '';""")
+            assert not problem, f"Bookmarks toolbar {mode}: {problem}"
+            assert_window_controls(f"bookmarks {mode}")
+            passed(f"bookmarks toolbar: {mode}, visible below header and clickable")
+        # Dark left panel, light right panel: the root tone follows the right
+        # (window controls) edge, the bookmarks row must follow the left panel.
+        chrome("gZenViewSplitter.splitTabs(window.smokeTabs,'vsep');")
+        wait_for(lambda: chrome("return document.querySelectorAll('.floating-domain-split-bar').length===2;"), "bookmarks split")
+        wait_for(lambda: chrome("""return document.getElementById('PersonalToolbar').dataset.pageTone==='dark'
+          && document.documentElement.getAttribute('floating-domain-page-tone')==='light';"""), "bookmarks follow top-left panel tone")
+        time.sleep(0.6)
+        assert chrome("""const item=document.querySelector('#PlacesToolbarItems .bookmark-item'), r=item.getBoundingClientRect();
+          const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2); return item===hit || item.contains(hit);"""), "Bookmarks clickable in Split View"
+        chrome("gZenViewSplitter.unsplitCurrentView();")
+        wait_for(lambda: chrome("return !document.querySelector('.floating-domain-split-bar');"), "bookmarks unsplit")
+        passed("bookmarks toolbar: Split View tone follows top-left panel, still clickable")
+        chrome("setToolbarVisibility(document.getElementById('PersonalToolbar'),'never');")
+        wait_for(lambda: chrome("return !document.documentElement.hasAttribute('zen-has-bookmarks');"), "bookmarks hidden")
+        time.sleep(0.3)
+        assert chrome("""const c=gBrowser.selectedBrowser.closest('.browserSidebarContainer');
+          return getComputedStyle(c).paddingTop==='52px';"""), "Hiding bookmarks restores the 52px header"
+        passed("hiding bookmarks toolbar restores header height")
         # Hiding the top toolbar is what gives Zen's wrapper paint containment.
         chrome("Services.prefs.setBoolPref('zen.view.compact.hide-toolbar',true); gZenCompactModeManager.toggle();")
         wait_for(lambda: chrome("return document.documentElement.getAttribute('zen-compact-mode')==='true';"), "compact mode")

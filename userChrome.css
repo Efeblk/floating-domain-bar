@@ -14,7 +14,12 @@
       calc(100vw - var(--floating-domain-bar-sidebar-width) - 368px)
     )
   );
-  --floating-domain-bar-reserved-space: 52px;
+  --floating-domain-bar-header-space: 52px;
+  --floating-domain-bar-bookmarks-height: 0px;
+  --floating-domain-bar-reserved-space: calc(
+    var(--floating-domain-bar-header-space) +
+      var(--floating-domain-bar-bookmarks-height)
+  );
   --floating-domain-bar-sidebar-width: 0px;
   --floating-domain-bar-control-gap: 3px;
   --floating-domain-bar-radius: 14px;
@@ -228,6 +233,46 @@
   pointer-events: auto !important;
 }
 
+/* Zen hosts the bookmarks toolbar beside #nav-bar in the collapsed navbar
+ * wrapper. When it is shown, give it its own row below the header and grow
+ * each panel's reserved space so web content starts beneath it. */
+:root[zen-has-bookmarks]:not([customizing]) {
+  /* Matches Zen's own bookmarks toolbar height (zen-theme.css). */
+  --floating-domain-bar-bookmarks-height: 30px;
+}
+
+:root[zen-has-bookmarks]:not([customizing]):not([inDOMFullscreen="true"])
+  #PersonalToolbar:not([collapsed]) {
+  position: absolute !important;
+  inset: var(--floating-domain-bar-header-space) 0 auto !important;
+  z-index: 1001 !important;
+  box-sizing: border-box !important;
+  width: auto !important;
+  height: var(--floating-domain-bar-bookmarks-height) !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  overflow: hidden !important;
+  color: var(--floating-domain-bar-outer-foreground) !important;
+  background: transparent !important;
+  border: 0 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  -moz-window-dragging: no-drag !important;
+}
+
+/* In Split View the row sits over the top-left panel, whose tone can differ
+ * from the window-controls edge that drives the root tone. */
+#PersonalToolbar[data-page-tone="dark"] {
+  --floating-domain-bar-outer-foreground: rgba(248, 248, 250, 0.86);
+}
+
+#PersonalToolbar[data-page-tone="light"] {
+  --floating-domain-bar-outer-foreground: rgba(22, 22, 26, 0.82);
+}
+
 :root:not([customizing]) #tabbrowser-tabbox {
   position: relative !important;
 }
@@ -252,7 +297,7 @@
   display: block !important;
   box-sizing: border-box !important;
   width: 100% !important;
-  height: var(--floating-domain-bar-reserved-space) !important;
+  height: var(--floating-domain-bar-header-space) !important;
   background: transparent !important;
   pointer-events: auto !important;
   -moz-window-dragging: drag !important;

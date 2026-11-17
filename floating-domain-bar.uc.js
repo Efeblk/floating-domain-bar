@@ -868,6 +868,35 @@
         edgeBrowser = rightmostTab?.linkedBrowser ?? edgeBrowser;
       }
 
+      // The bookmarks toolbar row starts at the top-left panel, which in a
+      // split can have a different tone than the window-controls edge.
+      let bookmarksBrowser = gBrowser.selectedBrowser;
+      if (tabs.length >= 2) {
+        const topLeftTab = tabs.reduce((best, tab) => {
+          const rect = getSplitContainer(tab)?.getBoundingClientRect();
+          const bestRect = best && getSplitContainer(best)?.getBoundingClientRect();
+          if (!rect) {
+            return best;
+          }
+          if (
+            !bestRect ||
+            rect.top < bestRect.top - 1 ||
+            (Math.abs(rect.top - bestRect.top) <= 1 && rect.left < bestRect.left)
+          ) {
+            return tab;
+          }
+          return best;
+        }, null);
+        bookmarksBrowser = topLeftTab?.linkedBrowser ?? bookmarksBrowser;
+      }
+      const bookmarksToolbar = document.getElementById("PersonalToolbar");
+      const bookmarksAppearance = pageAppearanceByBrowser.get(bookmarksBrowser);
+      if (bookmarksAppearance) {
+        applyTone(bookmarksToolbar, bookmarksAppearance);
+      } else {
+        bookmarksToolbar?.removeAttribute("data-page-tone");
+      }
+
       const edgeAppearance = pageAppearanceByBrowser.get(edgeBrowser);
       if (edgeAppearance) {
         document.documentElement.setAttribute(
@@ -1453,6 +1482,9 @@
       document.documentElement.removeAttribute(
         "floating-domain-page-tone"
       );
+      document
+        .getElementById("PersonalToolbar")
+        ?.removeAttribute("data-page-tone");
 
       for (const { node, parent, nextSibling } of originalPositions.reverse()) {
         if (nextSibling?.parentNode === parent) {
