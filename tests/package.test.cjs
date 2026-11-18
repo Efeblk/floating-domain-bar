@@ -16,6 +16,8 @@ test("Sine metadata identifies the public Zen package and update source", () => 
   assert.equal(theme.homepage, "https://github.com/Efeblk/floating-domain-bar");
   assert.match(theme.version, /^\d+\.\d+\.\d+$/);
   assert.deepEqual(theme.fork, ["zen"]);
+  // Store reviewers require the AI usage status (sineorg/store#1232).
+  assert.equal(theme.ai, "yes");
   assert.match(theme.createdAt, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(new Date(theme.createdAt).toISOString().slice(0, 10), theme.createdAt);
   // Sine updates only when updatedAt is strictly later, ignoring version, so a
