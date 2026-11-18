@@ -19,9 +19,10 @@ Submitted on **2026-09-22** as store issue
 [#1231](https://github.com/sineorg/store/issues/1231), which the store's
 automation closed after opening PR
 [#1232](https://github.com/sineorg/store/pull/1232). As of **2026-10-17** that
-PR is open and unreviewed, and has conflicts in `marketplace.json`. Other new-mod
-PRs back to July are also still open; only update PRs for listed mods are
-being merged. Do not open another submission. Leave conflict resolution to the
+PR was open and unreviewed, with conflicts in `marketplace.json`. On
+**2026-10-22** maintainer CosmoCreeper approved the concept and asked for the
+AI usage status in the metadata; `"ai": "yes"` was added to `theme.json` on
+**2026-11-18**. Do not open another submission. Leave conflict resolution to the
 maintainers' automation unless they ask.
 
 The PR snapshots v0.20.4. Once listed, the store's update workflow pulls the
@@ -62,6 +63,7 @@ installation until the entry is available.
 - Ship the CSS and JavaScript paths registered in `theme.json` at the
   repository root. There is no build step.
 - Restrict the mod to Zen with `fork: ["zen"]`; the script uses Zen internals.
+- Keep `ai: "yes"`; the store requires the AI usage status.
 - Bump `version`, `updatedAt`, and CHANGELOG.md together when publishing updates.
   Sine installs an update only when `updatedAt` is strictly later than the
   installed copy's; it ignores `version` and release tags. Use a full UTC
