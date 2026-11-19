@@ -2,6 +2,16 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## [0.21.1] - 2026-11-19
+
+### Düzeltildi
+
+- Fare sağ üstteki pencere düğmelerine gelince sayfa yaklaşık 30 px yukarı
+  zıplıyordu. `zen.view.hide-window-controls` açıkken Zen üst şerit üzerine
+  gelindiğinde `#tabbrowser-tabpanels[has-toolbar-hovered]` ile sayfaya negatif
+  üst boşluk veriyor; mod kendi başlık satırını zaten ayırdığı için bu boşluk
+  sıfırlandı. Smoke testi her düzende bunu denetler.
+
 ## [0.21.0] - 2026-11-18
 
 ### Düzeltildi
