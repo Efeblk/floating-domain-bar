@@ -195,6 +195,16 @@ def main():
             wait_for(lambda: chrome("return document.activeElement===gURLBar.inputField && getComputedStyle(gURLBar.inputField).visibility==='visible';"), f"visible editor: {mode}")
             client.find_element("css selector", "#urlbar-input").send_keys(Keys.ESCAPE)
             assert_window_controls(mode)
+            # Hovering the window controls must not pull the page up (Zen's
+            # hide-window-controls applies a negative margin on this attribute).
+            before = chrome("""Services.prefs.setBoolPref('zen.view.hide-window-controls',true);
+              document.getElementById('tabbrowser-tabpanels').setAttribute('has-toolbar-hovered','true');
+              return gBrowser.selectedBrowser.getBoundingClientRect().top;""")
+            time.sleep(1)  # Zen animates the margin.
+            shift = chrome("""const top=gBrowser.selectedBrowser.getBoundingClientRect().top;
+              document.getElementById('tabbrowser-tabpanels').removeAttribute('has-toolbar-hovered');
+              return top-arguments[0];""", before)
+            assert shift == 0, f"Window-control hover shifts the page by {shift}px: {mode}"
             passed(f"browser layout: {mode}, header hit targets, editor and window controls")
         # Zen hosts the bookmarks toolbar beside #nav-bar in the collapsed navbar
         # wrapper; it must get its own visible, clickable row below the header.
